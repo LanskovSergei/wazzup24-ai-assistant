@@ -74,38 +74,3 @@ wazzup24-ai-assistant/
 │   └── icon128.png
 └── README.md
 ```
-
-# Секретные данные
-*.env
-*.key
-config.local.js
-
-# Архивы расширения
-*.crx
-*.pem
-*.zip
-
-# Системные файлы
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Логи
-*.log
-npm-debug.log*
-
-# Временные файлы
-tmp/
-temp/
-.cache/
-
-# Node modules (если будем использовать)
-node_modules/
-package-lock.json
-yarn.lock
