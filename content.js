@@ -192,10 +192,15 @@ class WazzupAIAssistant {
   }
 
   async generateResponses(clientMessage) {
+    console.log('🎯 generateResponses вызван с сообщением:', clientMessage);
+    
     if (!this.apiKey) {
+      console.error('❌ API ключ не найден');
       this.showError('API ключ OpenAI не настроен. Откройте настройки расширения.');
       return;
     }
+
+    console.log('✅ API ключ найден:', this.apiKey.substring(0, 10) + '...');
 
     if (this.isGenerating) {
       console.log('⏳ Генерация уже выполняется...');
@@ -208,6 +213,7 @@ class WazzupAIAssistant {
     try {
       // Получаем контекст последних сообщений
       const context = this.getConversationContext();
+      console.log('📝 Контекст получен:', context);
       
       // Получаем настройки из storage
       const settings = await chrome.storage.sync.get([
@@ -218,8 +224,9 @@ class WazzupAIAssistant {
         'contextMessages'
       ]);
       
-      // Отправляем запрос через background script
-      chrome.runtime.sendMessage({
+      console.log('⚙️ Настройки получены:', settings);
+      
+      const messageData = {
         type: 'GENERATE_RESPONSES',
         data: {
           clientMessage,
@@ -232,14 +239,50 @@ class WazzupAIAssistant {
             maxTokens: settings.maxTokens || 500
           }
         }
-      }, (response) => {
+      };
+      
+      console.log('📤 Отправка сообщения в background:', messageData);
+      
+      // Создаём таймаут на 30 секунд
+      const timeoutId = setTimeout(() => {
+        console.error('⏱️ ТАЙМАУТ! Ответ не получен за 30 секунд');
+        this.showError('Превышено время ожидания ответа от сервера');
+        this.isGenerating = false;
+      }, 30000);
+      
+      // Отправляем запрос через background script
+      chrome.runtime.sendMessage(messageData, (response) => {
+        clearTimeout(timeoutId);
+        
+        console.log('📥 Callback вызван');
+        console.log('📥 Ответ получен:', response);
+        console.log('📥 chrome.runtime.lastError:', chrome.runtime.lastError);
+        
+        if (chrome.runtime.lastError) {
+          console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
+          this.showError('Ошибка связи с расширением: ' + chrome.runtime.lastError.message);
+          this.isGenerating = false;
+          return;
+        }
+        
+        if (!response) {
+          console.error('❌ Пустой ответ от background script');
+          this.showError('Не получен ответ от background script. Проверьте консоль background script (chrome://extensions).');
+          this.isGenerating = false;
+          return;
+        }
+        
         if (response.success) {
+          console.log('✅ Успешно получены варианты:', response.variants);
           this.displayResponses(response.variants);
         } else {
+          console.error('❌ Ошибка в ответе:', response.error);
           this.showError('Ошибка: ' + response.error);
         }
         this.isGenerating = false;
       });
+      
+      console.log('✅ Сообщение отправлено, ждём ответа...');
       
     } catch (error) {
       console.error('❌ Ошибка генерации:', error);
