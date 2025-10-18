@@ -114,12 +114,14 @@ class WazzupAIAssistant {
   }
 
   watchMessages() {
-    // Пробуем найти список сообщений разными способами
+    // Ищем родительский контейнер всех сообщений
     const messagesList = 
-      document.querySelector(this.selectors.messagesList) ||
+      document.querySelector('.body-messages-list') ||
       document.querySelector('[class*="messages-list"]') ||
       document.querySelector('[class*="chat-messages"]') ||
-      document.querySelector('[class*="message-container"]');
+      // НОВОЕ: ищем родителя элементов с классом message-item-hover
+      document.querySelector('.message-item-hover')?.parentElement ||
+      document.body; // в крайнем случае следим за всем body
     
     if (!messagesList) {
       console.log('⏳ Список сообщений не найден, повтор через 2 сек...');
@@ -136,11 +138,11 @@ class WazzupAIAssistant {
           // Проверяем, добавлено ли входящее сообщение
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1 && node.querySelector) {
-              // Пробуем найти входящее сообщение
+              // Ищем входящие сообщения
               const incomingMsg = 
-                node.querySelector(this.selectors.incomingMessage) ||
+                node.querySelector('.body-messages-item.incoming') ||
                 (node.classList && node.classList.contains('incoming') ? node : null) ||
-                (node.querySelector && node.querySelector('[class*="incoming"]'));
+                node.querySelector('[class*="incoming"]');
                 
               if (incomingMsg) {
                 this.onNewIncomingMessage(incomingMsg);
