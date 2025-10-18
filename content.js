@@ -8,6 +8,7 @@ class WazzupAIAssistant {
     this.isGenerating = false;
     this.lastMessageText = '';
     this.messageObserver = null;
+    this.lastProcessedChatId = null; // Для отслеживания смены чата
     
     // Селекторы для Wazzup24
     this.selectors = {
@@ -73,6 +74,12 @@ class WazzupAIAssistant {
     // Следим за новыми сообщениями
     this.watchMessages();
     
+    // НОВОЕ: Следим за сменой чата
+    this.watchChatChanges();
+    
+    // НОВОЕ: Анализируем последнее сообщение при загрузке
+    this.checkLastMessage();
+    
     console.log('✅ Расширение готово к работе');
   }
 
@@ -95,8 +102,8 @@ class WazzupAIAssistant {
       </div>
       <div class="wai-content">
         <div class="wai-empty">
-          <p>Ожидание входящего сообщения...</p>
-          <small>Когда клиент напишет, я предложу варианты ответов</small>
+          <p>Анализирую последнее сообщение...</p>
+          <small>Подождите, генерирую варианты ответов</small>
         </div>
       </div>
     `;
@@ -113,12 +120,56 @@ class WazzupAIAssistant {
     console.log('🎨 Панель создана и добавлена в DOM');
   }
 
+  // НОВОЕ: Проверка последнего сообщения при загрузке чата
+  checkLastMessage() {
+    console.log('🔍 Проверка последнего входящего сообщения...');
+    
+    // Ищем все входящие сообщения
+    const incomingMessages = document.querySelectorAll(
+      '.body-messages-item.incoming, [class*="incoming"]'
+    );
+    
+    if (incomingMessages.length === 0) {
+      console.log('ℹ️ Входящих сообщений не найдено');
+      this.showEmptyState();
+      return;
+    }
+    
+    // Берём последнее входящее сообщение
+    const lastIncoming = incomingMessages[incomingMessages.length - 1];
+    console.log('✅ Найдено последнее входящее сообщение');
+    
+    // Обрабатываем его
+    this.onNewIncomingMessage(lastIncoming, true);
+  }
+
+  // НОВОЕ: Отслеживание смены чата
+  watchChatChanges() {
+    console.log('👀 Начинаем отслеживать смену чата...');
+    
+    // Следим за изменением URL
+    let lastUrl = location.href;
+    new MutationObserver(() => {
+      const url = location.href;
+      if (url !== lastUrl) {
+        console.log('🔄 URL изменился, чат переключен');
+        lastUrl = url;
+        this.lastMessageText = ''; // Сбрасываем последнее сообщение
+        this.lastProcessedChatId = null;
+        
+        // Проверяем последнее сообщение в новом чате
+        setTimeout(() => this.checkLastMessage(), 1000);
+      }
+    }).observe(document, { subtree: true, childList: true });
+  }
+
   watchMessages() {
     // Ищем родительский контейнер всех сообщений
     const messagesList = 
       document.querySelector('.body-messages-list') ||
       document.querySelector('[class*="messages-list"]') ||
       document.querySelector('[class*="chat-messages"]') ||
+      document.querySelector('.chat-body-wrapper') ||
       // НОВОЕ: ищем родителя элементов с классом message-item-hover
       document.querySelector('.message-item-hover')?.parentElement ||
       document.body; // в крайнем случае следим за всем body
@@ -145,7 +196,7 @@ class WazzupAIAssistant {
                 node.querySelector('[class*="incoming"]');
                 
               if (incomingMsg) {
-                this.onNewIncomingMessage(incomingMsg);
+                this.onNewIncomingMessage(incomingMsg, false);
               }
             }
           });
@@ -161,8 +212,8 @@ class WazzupAIAssistant {
     console.log('👀 Наблюдатель за сообщениями активирован');
   }
 
-  onNewIncomingMessage(messageElement) {
-    console.log('🔔 Обнаружено входящее сообщение');
+  onNewIncomingMessage(messageElement, isInitial = false) {
+    console.log('🔔 Обнаружено входящее сообщение', isInitial ? '(при загрузке)' : '(новое)');
     
     // Получаем текст сообщения (пробуем разные селекторы)
     const textElement = 
@@ -173,22 +224,43 @@ class WazzupAIAssistant {
       
     if (!textElement) {
       console.log('⚠️ Текст сообщения не найден');
+      if (isInitial) {
+        this.showEmptyState();
+      }
       return;
     }
 
     const messageText = textElement.textContent.trim();
     
     // Игнорируем пустые сообщения и дубликаты
-    if (!messageText || messageText === this.lastMessageText) {
-      console.log('ℹ️ Сообщение пустое или дубликат');
+    if (!messageText) {
+      console.log('ℹ️ Сообщение пустое');
+      if (isInitial) {
+        this.showEmptyState();
+      }
       return;
     }
+    
+    // Для начального сообщения или если текст изменился
+    if (isInitial || messageText !== this.lastMessageText) {
+      this.lastMessageText = messageText;
+      console.log('📨 Сообщение для обработки:', messageText);
 
-    this.lastMessageText = messageText;
-    console.log('📨 Новое сообщение:', messageText);
+      // Генерируем варианты ответов
+      this.generateResponses(messageText);
+    } else {
+      console.log('ℹ️ Дубликат сообщения, игнорируем');
+    }
+  }
 
-    // Генерируем варианты ответов
-    this.generateResponses(messageText);
+  showEmptyState() {
+    const content = this.panel.querySelector('.wai-content');
+    content.innerHTML = `
+      <div class="wai-empty">
+        <p>Нет входящих сообщений</p>
+        <small>Когда клиент напишет, я предложу варианты ответов</small>
+      </div>
+    `;
   }
 
   async generateResponses(clientMessage) {
