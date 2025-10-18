@@ -9,7 +9,7 @@ class WazzupAIAssistant {
     this.lastMessageText = '';
     this.messageObserver = null;
     
-    // Селекторы для Wazzup24 (из твоего HTML)
+    // Селекторы для Wazzup24
     this.selectors = {
       chatInput: '.chat-input-text[contenteditable="true"]',
       messagesList: '.body-messages-list',
@@ -50,13 +50,22 @@ class WazzupAIAssistant {
   setup() {
     console.log('🔧 Настройка интерфейса...');
     
-    // Проверяем, что мы на странице чата
-    const chatContainer = document.querySelector(this.selectors.chatContainer);
+    // Проверяем, что мы на странице чата (пробуем разные селекторы)
+    const chatContainer = 
+      document.querySelector(this.selectors.chatContainer) ||
+      document.querySelector('[class*="body-messages"]') ||
+      document.querySelector('[class*="chat-container"]') ||
+      document.querySelector('[class*="messages-wrapper"]') ||
+      document.querySelector('main') ||
+      document.querySelector('#app');
+    
     if (!chatContainer) {
-      console.log('⏳ Чат не загружен, повтор через 1 сек...');
-      setTimeout(() => this.setup(), 1000);
+      console.log('⏳ Чат не загружен, повтор через 2 сек...');
+      setTimeout(() => this.setup(), 2000);
       return;
     }
+
+    console.log('✅ Контейнер чата найден:', chatContainer.className || chatContainer.tagName);
 
     // Создаём панель с вариантами ответов
     this.createPanel();
@@ -70,6 +79,7 @@ class WazzupAIAssistant {
   createPanel() {
     // Проверяем, не создана ли уже панель
     if (document.getElementById('wazzup-ai-panel')) {
+      console.log('ℹ️ Панель уже существует');
       return;
     }
 
@@ -100,17 +110,24 @@ class WazzupAIAssistant {
       panel.classList.toggle('wai-minimized');
     });
 
-    console.log('🎨 Панель создана');
+    console.log('🎨 Панель создана и добавлена в DOM');
   }
 
   watchMessages() {
-    const messagesList = document.querySelector(this.selectors.messagesList);
+    // Пробуем найти список сообщений разными способами
+    const messagesList = 
+      document.querySelector(this.selectors.messagesList) ||
+      document.querySelector('[class*="messages-list"]') ||
+      document.querySelector('[class*="chat-messages"]') ||
+      document.querySelector('[class*="message-container"]');
     
     if (!messagesList) {
-      console.log('⏳ Список сообщений не найден, повтор...');
-      setTimeout(() => this.watchMessages(), 1000);
+      console.log('⏳ Список сообщений не найден, повтор через 2 сек...');
+      setTimeout(() => this.watchMessages(), 2000);
       return;
     }
+
+    console.log('✅ Список сообщений найден:', messagesList.className || messagesList.tagName);
 
     // Создаём наблюдатель за изменениями DOM
     this.messageObserver = new MutationObserver((mutations) => {
@@ -119,7 +136,12 @@ class WazzupAIAssistant {
           // Проверяем, добавлено ли входящее сообщение
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1 && node.querySelector) {
-              const incomingMsg = node.querySelector(this.selectors.incomingMessage);
+              // Пробуем найти входящее сообщение
+              const incomingMsg = 
+                node.querySelector(this.selectors.incomingMessage) ||
+                (node.classList && node.classList.contains('incoming') ? node : null) ||
+                (node.querySelector && node.querySelector('[class*="incoming"]'));
+                
               if (incomingMsg) {
                 this.onNewIncomingMessage(incomingMsg);
               }
@@ -138,14 +160,25 @@ class WazzupAIAssistant {
   }
 
   onNewIncomingMessage(messageElement) {
-    // Получаем текст сообщения
-    const textElement = messageElement.querySelector(this.selectors.messageText);
-    if (!textElement) return;
+    console.log('🔔 Обнаружено входящее сообщение');
+    
+    // Получаем текст сообщения (пробуем разные селекторы)
+    const textElement = 
+      messageElement.querySelector(this.selectors.messageText) ||
+      messageElement.querySelector('[dir="auto"]') ||
+      messageElement.querySelector('.body-text') ||
+      messageElement.querySelector('[class*="text"]');
+      
+    if (!textElement) {
+      console.log('⚠️ Текст сообщения не найден');
+      return;
+    }
 
     const messageText = textElement.textContent.trim();
     
     // Игнорируем пустые сообщения и дубликаты
     if (!messageText || messageText === this.lastMessageText) {
+      console.log('ℹ️ Сообщение пустое или дубликат');
       return;
     }
 
@@ -174,19 +207,41 @@ class WazzupAIAssistant {
       // Получаем контекст последних сообщений
       const context = this.getConversationContext();
       
-      // Формируем промпт для GPT
-      const prompt = this.buildPrompt(clientMessage, context);
+      // Получаем настройки из storage
+      const settings = await chrome.storage.sync.get([
+        'model',
+        'customPrompt',
+        'temperature',
+        'maxTokens',
+        'contextMessages'
+      ]);
       
-      // Запрос к OpenAI API
-      const responses = await this.callOpenAI(prompt);
-      
-      // Показываем варианты ответов
-      this.displayResponses(responses);
+      // Отправляем запрос через background script
+      chrome.runtime.sendMessage({
+        type: 'GENERATE_RESPONSES',
+        data: {
+          clientMessage,
+          context,
+          settings: {
+            apiKey: this.apiKey,
+            model: settings.model || 'gpt-4',
+            customPrompt: settings.customPrompt || '',
+            temperature: settings.temperature || 0.7,
+            maxTokens: settings.maxTokens || 500
+          }
+        }
+      }, (response) => {
+        if (response.success) {
+          this.displayResponses(response.variants);
+        } else {
+          this.showError('Ошибка: ' + response.error);
+        }
+        this.isGenerating = false;
+      });
       
     } catch (error) {
       console.error('❌ Ошибка генерации:', error);
       this.showError('Ошибка генерации ответов: ' + error.message);
-    } finally {
       this.isGenerating = false;
     }
   }
@@ -194,14 +249,15 @@ class WazzupAIAssistant {
   getConversationContext() {
     // Получаем последние 5 сообщений для контекста
     const messages = [];
-    const allMessages = document.querySelectorAll('.body-messages-item');
+    const allMessages = document.querySelectorAll('.body-messages-item, [class*="message-item"]');
     
     // Берём последние 5 сообщений
     const recentMessages = Array.from(allMessages).slice(-5);
     
     recentMessages.forEach((msgEl) => {
-      const isIncoming = msgEl.classList.contains('incoming');
-      const textEl = msgEl.querySelector(this.selectors.messageText);
+      const isIncoming = msgEl.classList.contains('incoming') || 
+                        msgEl.querySelector('[class*="incoming"]');
+      const textEl = msgEl.querySelector('[dir="auto"], .body-text, [class*="text"]');
       
       if (textEl) {
         messages.push({
@@ -212,92 +268,6 @@ class WazzupAIAssistant {
     });
     
     return messages;
-  }
-
-  buildPrompt(clientMessage, context) {
-    // Промпт на основе ТЗ
-    let prompt = `Ты — интеллектуальный помощник интернет-магазина DJI Market. 
-Твоя задача — предложить менеджеру 3 варианта ответа на сообщение клиента.
-
-Тон общения:
-- Дружелюбный и профессиональный
-- Адаптируйся под стиль клиента (формальный/неформальный)
-- Используй "Вы", "Вас" с большой буквы
-- Немного смайликов 🙂
-
-`;
-
-    // Добавляем контекст
-    if (context.length > 0) {
-      prompt += '\nКонтекст переписки:\n';
-      context.forEach((msg) => {
-        const role = msg.role === 'client' ? 'Клиент' : 'Менеджер';
-        prompt += `${role}: ${msg.text}\n`;
-      });
-    }
-
-    prompt += `\nПоследнее сообщение клиента: "${clientMessage}"
-
-Сгенерируй 3 варианта ответа:
-1. Короткий и конкретный
-2. Развёрнутый с дополнительной информацией
-3. Дружелюбный с рекомендациями
-
-Формат ответа (JSON):
-{
-  "variant1": "текст ответа 1",
-  "variant2": "текст ответа 2",
-  "variant3": "текст ответа 3"
-}`;
-
-    return prompt;
-  }
-
-  async callOpenAI(prompt) {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: 'Ты — ассистент для менеджера интернет-магазина дронов DJI.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 500
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error?.message || 'Ошибка API OpenAI');
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    
-    // Парсим JSON из ответа
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      throw new Error('Неверный формат ответа от GPT');
-    }
-    
-    const variants = JSON.parse(jsonMatch[0]);
-    
-    return [
-      { label: 'Короткий', text: variants.variant1 },
-      { label: 'Подробный', text: variants.variant2 },
-      { label: 'Дружелюбный', text: variants.variant3 }
-    ];
   }
 
   showLoading() {
