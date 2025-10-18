@@ -35,6 +35,9 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
+// Логирование статистики
+let generationCount = 0;
+
 // Обработка сообщений от content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('🔔 ЛЮБОЕ сообщение получено!');
@@ -69,6 +72,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     default:
       console.warn('⚠️ Неизвестный тип сообщения:', message.type);
   }
+  
+  return false; // Для синхронных ответов
 });
 
 // Получение настроек
@@ -171,7 +176,7 @@ async function handleGenerateResponses(data, sendResponse) {
     const successResponse = { 
       success: true, 
       variants,
-      usage: responseData.usage // Статистика использования токенов
+      usage: responseData.usage
     };
     
     console.log('📤 Отправка успешного ответа в content script:', successResponse);
@@ -202,12 +207,10 @@ function buildPrompt(clientMessage, context, customPrompt) {
 
 `;
 
-  // Добавляем кастомный промпт, если есть
   if (customPrompt) {
     prompt += `\nДополнительные инструкции: ${customPrompt}\n`;
   }
 
-  // Добавляем контекст переписки
   if (context && context.length > 0) {
     prompt += '\nКонтекст переписки:\n';
     context.forEach((msg) => {
@@ -239,7 +242,6 @@ function buildPrompt(clientMessage, context, customPrompt) {
 function parseGPTResponse(content) {
   console.log('🔍 Парсинг ответа GPT...');
   try {
-    // Пытаемся найти JSON в ответе
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     
     if (!jsonMatch) {
@@ -252,7 +254,6 @@ function parseGPTResponse(content) {
     const parsed = JSON.parse(jsonMatch[0]);
     console.log('✅ JSON распарсен:', parsed);
     
-    // Проверяем наличие всех вариантов
     if (!parsed.variant1 || !parsed.variant2 || !parsed.variant3) {
       console.error('❌ Неполный ответ от GPT:', parsed);
       throw new Error('Неполный ответ от GPT');
@@ -271,7 +272,6 @@ function parseGPTResponse(content) {
     console.error('❌ Ошибка парсинга ответа GPT:', error);
     console.log('📄 Исходный ответ:', content);
     
-    // Возвращаем запасные варианты
     console.log('⚠️ Использую запасные варианты');
     return [
       { label: 'Короткий', text: 'Спасибо за обращение! Уточню информацию и отвечу в течение нескольких минут 🙂' },
@@ -286,12 +286,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'sync') {
     console.log('⚙️ Настройки изменены:', changes);
     
-    // Если изменился статус enabled
     if (changes.enabled) {
       const isEnabled = changes.enabled.newValue;
       console.log(`🔄 Расширение ${isEnabled ? 'включено' : 'выключено'}`);
       
-      // Уведомляем все вкладки с Wazzup24
       notifyAllTabs({ type: 'ENABLED_CHANGED', enabled: isEnabled });
     }
   }
@@ -313,35 +311,5 @@ async function notifyAllTabs(message) {
     console.error('❌ Ошибка уведомления вкладок:', error);
   }
 }
-
-// Обработка клика на иконку расширения
-chrome.action.onClicked.addListener(async (tab) => {
-  // Проверяем, на странице Wazzup24 ли мы
-  if (tab.url && tab.url.includes('wazzup24.com')) {
-    console.log('📌 Клик на иконку на странице Wazzup24');
-    
-    // Отправляем команду toggle панели
-    try {
-      await chrome.tabs.sendMessage(tab.id, { 
-        type: 'TOGGLE_PANEL' 
-      });
-    } catch (error) {
-      console.log('ℹ️ Content script не отвечает, возможно страница не загружена');
-    }
-  }
-});
-
-// Логирование статистики
-let generationCount = 0;
-
-// Периодическая очистка кеша (опционально)
-chrome.alarms.create('clearCache', { periodInMinutes: 60 });
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'clearCache') {
-    console.log('🧹 Очистка кеша...');
-    // Здесь можно добавить логику очистки
-  }
-});
 
 console.log('✅ Background Service Worker готов к работе');
