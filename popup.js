@@ -1,226 +1,107 @@
-// popup.js - Скрипт настроек расширения
+// popup.js - Скрипт для окна настроек
 
-console.log('🔧 Popup загружен');
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('settingsForm');
+  const apiKeyInput = document.getElementById('apiKey');
+  const modelSelect = document.getElementById('model');
+  const customPromptInput = document.getElementById('customPrompt');
+  const temperatureInput = document.getElementById('temperature');
+  const temperatureValue = document.getElementById('temperatureValue');
+  const maxTokensInput = document.getElementById('maxTokens');
+  const contextMessagesInput = document.getElementById('contextMessages');
+  const statusDiv = document.getElementById('status');
 
-// Элементы DOM
-const elements = {
-  enabledToggle: document.getElementById('enabledToggle'),
-  apiKey: document.getElementById('apiKey'),
-  modelSelect: document.getElementById('modelSelect'),
-  promptInput: document.getElementById('promptInput'),
-  temperature: document.getElementById('temperature'),
-  tempValue: document.getElementById('tempValue'),
-  maxTokens: document.getElementById('maxTokens'),
-  contextMessages: document.getElementById('contextMessages'),
-  saveBtn: document.getElementById('saveBtn'),
-  status: document.getElementById('status'),
-  advancedToggle: document.getElementById('advancedToggle'),
-  advancedContent: document.getElementById('advancedContent')
-};
-
-// Настройки по умолчанию
-const defaultSettings = {
-  enabled: true,
-  apiKey: '',
-  model: 'gpt-4',
-  customPrompt: '',
-  temperature: 0.7,
-  maxTokens: 500,
-  contextMessages: 5
-};
-
-// Загрузка настроек при открытии popup
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📂 Загрузка настроек...');
-  await loadSettings();
-  setupEventListeners();
-});
-
-// Загрузка настроек из storage
-async function loadSettings() {
-  try {
-    const settings = await chrome.storage.sync.get(defaultSettings);
-    
-    elements.enabledToggle.checked = settings.enabled;
-    elements.apiKey.value = settings.apiKey || '';
-    elements.modelSelect.value = settings.model || 'gpt-4';
-    elements.promptInput.value = settings.customPrompt || '';
-    elements.temperature.value = settings.temperature || 0.7;
-    elements.tempValue.textContent = settings.temperature || 0.7;
-    elements.maxTokens.value = settings.maxTokens || 500;
-    elements.contextMessages.value = settings.contextMessages || 5;
-    
-    console.log('✅ Настройки загружены:', settings);
-  } catch (error) {
-    console.error('❌ Ошибка загрузки настроек:', error);
-    showStatus('Ошибка загрузки настроек', 'error');
-  }
-}
-
-// Настройка обработчиков событий
-function setupEventListeners() {
-  // Кнопка сохранения
-  elements.saveBtn.addEventListener('click', saveSettings);
-  
-  // Сохранение по Enter в поле API ключа
-  elements.apiKey.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      saveSettings();
+  // Загрузка сохранённых настроек
+  chrome.storage.sync.get([
+    'apiKey',
+    'model',
+    'customPrompt',
+    'temperature',
+    'maxTokens',
+    'contextMessages'
+  ], (data) => {
+    if (data.apiKey) apiKeyInput.value = data.apiKey;
+    if (data.model) modelSelect.value = data.model;
+    if (data.customPrompt) customPromptInput.value = data.customPrompt;
+    if (data.temperature !== undefined) {
+      temperatureInput.value = data.temperature;
+      temperatureValue.textContent = data.temperature;
     }
+    if (data.maxTokens) maxTokensInput.value = data.maxTokens;
+    if (data.contextMessages) contextMessagesInput.value = data.contextMessages;
   });
-  
-  // Обновление значения температуры
-  elements.temperature.addEventListener('input', (e) => {
-    elements.tempValue.textContent = e.target.value;
+
+  // Обновление значения temperature
+  temperatureInput.addEventListener('input', (e) => {
+    temperatureValue.textContent = e.target.value;
   });
-  
-  // Toggle расширенных настроек
-  elements.advancedToggle.addEventListener('click', (e) => {
+
+  // Сохранение настроек
+  form.addEventListener('submit', (e) => {
     e.preventDefault();
-    elements.advancedContent.classList.toggle('show');
-    const isShown = elements.advancedContent.classList.contains('show');
-    elements.advancedToggle.textContent = isShown 
-      ? '⚙️ Скрыть расширенные настройки' 
-      : '⚙️ Расширенные настройки';
-  });
-  
-  // Мгновенное сохранение toggle
-  elements.enabledToggle.addEventListener('change', async () => {
-    try {
-      await chrome.storage.sync.set({ 
-        enabled: elements.enabledToggle.checked 
-      });
-      
-      const status = elements.enabledToggle.checked ? 'включено' : 'выключено';
-      showStatus(`Расширение ${status}`, 'success');
-      
-      // Отправляем сообщение content script о изменении статуса
-      notifyContentScript();
-    } catch (error) {
-      console.error('❌ Ошибка сохранения toggle:', error);
-    }
-  });
-}
 
-// Сохранение настроек
-async function saveSettings() {
-  const apiKey = elements.apiKey.value.trim();
-  
-  // Валидация API ключа
-  if (!apiKey) {
-    showStatus('Введите API ключ OpenAI', 'error');
-    elements.apiKey.focus();
-    return;
-  }
-  
-  if (!apiKey.startsWith('sk-')) {
-    showStatus('API ключ должен начинаться с "sk-"', 'error');
-    elements.apiKey.focus();
-    return;
-  }
-  
-  // Отключаем кнопку во время сохранения
-  elements.saveBtn.disabled = true;
-  elements.saveBtn.textContent = 'Сохранение...';
-  
-  try {
     const settings = {
-      enabled: elements.enabledToggle.checked,
-      apiKey: apiKey,
-      model: elements.modelSelect.value,
-      customPrompt: elements.promptInput.value.trim(),
-      temperature: parseFloat(elements.temperature.value),
-      maxTokens: parseInt(elements.maxTokens.value),
-      contextMessages: parseInt(elements.contextMessages.value)
+      apiKey: apiKeyInput.value.trim(),
+      model: modelSelect.value,
+      customPrompt: customPromptInput.value.trim(),
+      temperature: parseFloat(temperatureInput.value),
+      maxTokens: parseInt(maxTokensInput.value),
+      contextMessages: parseInt(contextMessagesInput.value),
+      enabled: true
     };
-    
-    // Сохраняем в chrome.storage
-    await chrome.storage.sync.set(settings);
-    
-    console.log('✅ Настройки сохранены:', settings);
-    showStatus('Настройки успешно сохранены!', 'success');
-    
-    // Уведомляем content script об обновлении настроек
-    notifyContentScript();
-    
-    // Закрываем popup через 1.5 секунды
-    setTimeout(() => {
-      window.close();
-    }, 1500);
-    
-  } catch (error) {
-    console.error('❌ Ошибка сохранения:', error);
-    showStatus('Ошибка сохранения настроек', 'error');
-  } finally {
-    elements.saveBtn.disabled = false;
-    elements.saveBtn.textContent = 'Сохранить настройки';
-  }
-}
 
-// Показ статуса
-function showStatus(message, type = 'success') {
-  elements.status.textContent = message;
-  elements.status.className = `status ${type}`;
-  
-  // Автоматически скрываем через 5 секунд
-  setTimeout(() => {
-    elements.status.className = 'status';
-  }, 5000);
-}
-
-// Уведомление content script об изменениях
-async function notifyContentScript() {
-  try {
-    const [tab] = await chrome.tabs.query({ 
-      active: true, 
-      currentWindow: true 
-    });
-    
-    if (tab && tab.url && tab.url.includes('wazzup24.com')) {
-      await chrome.tabs.sendMessage(tab.id, { 
-        type: 'SETTINGS_UPDATED' 
-      });
-      console.log('📤 Уведомление отправлено content script');
+    // Валидация
+    if (!settings.apiKey) {
+      showStatus('Введите API ключ OpenAI', 'error');
+      return;
     }
-  } catch (error) {
-    console.log('ℹ️ Content script недоступен (возможно, страница не загружена)');
+
+    if (!settings.apiKey.startsWith('sk-')) {
+      showStatus('Неверный формат API ключа. Ключ должен начинаться с "sk-"', 'error');
+      return;
+    }
+
+    if (settings.maxTokens < 100 || settings.maxTokens > 2000) {
+      showStatus('Максимальная длина должна быть от 100 до 2000 токенов', 'error');
+      return;
+    }
+
+    if (settings.contextMessages < 5 || settings.contextMessages > 50) {
+      showStatus('Количество сообщений должно быть от 5 до 50', 'error');
+      return;
+    }
+
+    // Сохранение в Chrome Storage
+    chrome.storage.sync.set(settings, () => {
+      showStatus('✅ Настройки сохранены успешно!', 'success');
+      
+      // Уведомляем content script об обновлении настроек
+      chrome.tabs.query({ url: 'https://app.wazzup24.com/*' }, (tabs) => {
+        tabs.forEach((tab) => {
+          chrome.tabs.sendMessage(tab.id, { 
+            type: 'SETTINGS_UPDATED', 
+            settings 
+          }).catch(() => {
+            // Игнорируем ошибки, если вкладка не отвечает
+          });
+        });
+      });
+
+      // Закрываем popup через 2 секунды
+      setTimeout(() => {
+        window.close();
+      }, 2000);
+    });
+  });
+
+  function showStatus(message, type) {
+    statusDiv.textContent = message;
+    statusDiv.className = `status ${type}`;
+    
+    if (type === 'error') {
+      setTimeout(() => {
+        statusDiv.className = 'status';
+      }, 5000);
+    }
   }
-}
-
-// Валидация числовых полей
-elements.maxTokens.addEventListener('change', (e) => {
-  const value = parseInt(e.target.value);
-  if (value < 100) e.target.value = 100;
-  if (value > 2000) e.target.value = 2000;
 });
-
-elements.contextMessages.addEventListener('change', (e) => {
-  const value = parseInt(e.target.value);
-  if (value < 1) e.target.value = 1;
-  if (value > 10) e.target.value = 10;
-});
-
-// Показ/скрытие пароля (опционально)
-const togglePasswordBtn = document.createElement('button');
-togglePasswordBtn.textContent = '👁️';
-togglePasswordBtn.style.cssText = `
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 16px;
-  opacity: 0.6;
-`;
-togglePasswordBtn.addEventListener('click', () => {
-  const type = elements.apiKey.type === 'password' ? 'text' : 'password';
-  elements.apiKey.type = type;
-  togglePasswordBtn.textContent = type === 'password' ? '👁️' : '🙈';
-});
-
-// Добавляем кнопку показа пароля
-const apiKeyGroup = elements.apiKey.parentElement;
-apiKeyGroup.style.position = 'relative';
-apiKeyGroup.appendChild(togglePasswordBtn);
