@@ -11,9 +11,9 @@ class WazzupAIAssistant {
     this.lastProcessedChatId = null;
     this.keepAlivePort = null;
     
-    // Селекторы для Wazzup24 (ОБНОВЛЕНО!)
+    // Селекторы для Wazzup24
     this.selectors = {
-      chatInput: '.chat-input[contenteditable="true"]', // ИСПРАВЛЕНО!
+      chatInput: '.chat-input[contenteditable="true"]',
       messagesList: '.body-messages-list',
       incomingMessage: '.body-messages-item.incoming',
       messageText: '.body-text-message.body-text div[dir="auto"]',
@@ -27,10 +27,8 @@ class WazzupAIAssistant {
   async init() {
     console.log('📝 Инициализация расширения...');
     
-    // Загружаем API ключ из настроек
     await this.loadSettings();
     
-    // Ждём загрузки страницы
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.setup());
     } else {
@@ -90,7 +88,10 @@ class WazzupAIAssistant {
           <span class="wai-icon">✨</span>
           AI Подсказки
         </div>
-        <button class="wai-close" title="Свернуть">&times;</button>
+        <div class="wai-header-actions">
+          <button class="wai-refresh" title="Обновить ответы">🔄</button>
+          <button class="wai-close" title="Свернуть">&times;</button>
+        </div>
       </div>
       <div class="wai-content">
         <div class="wai-empty">
@@ -103,6 +104,17 @@ class WazzupAIAssistant {
     document.body.appendChild(panel);
     this.panel = panel;
 
+    // Обработчик кнопки обновления
+    panel.querySelector('.wai-refresh').addEventListener('click', () => {
+      console.log('🔄 Запрос на обновление ответов');
+      if (this.lastMessageText) {
+        this.generateResponses(this.lastMessageText);
+      } else {
+        this.showError('Нет сообщения для обновления');
+      }
+    });
+
+    // Обработчик кнопки закрытия
     panel.querySelector('.wai-close').addEventListener('click', () => {
       panel.classList.toggle('wai-minimized');
     });
@@ -232,7 +244,6 @@ class WazzupAIAssistant {
     `;
   }
 
-  // НОВОЕ: Метод для пробуждения Service Worker
   async wakeUpServiceWorker() {
     return new Promise((resolve) => {
       chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
@@ -271,7 +282,6 @@ class WazzupAIAssistant {
     this.showLoading();
 
     try {
-      // Сначала будим Service Worker
       await this.wakeUpServiceWorker();
       
       const context = this.getConversationContext();
@@ -431,11 +441,9 @@ class WazzupAIAssistant {
     console.log('✅ Варианты ответов отображены');
   }
 
-  // ИСПРАВЛЕНО!
   insertResponse(text) {
-    // Пробуем разные селекторы для поля ввода
     const inputField = 
-      document.querySelector('.chat-input[contenteditable="true"]') || // НОВЫЙ!
+      document.querySelector('.chat-input[contenteditable="true"]') ||
       document.querySelector('.chat-input') ||
       document.querySelector('.chat-input-text[contenteditable="true"]') ||
       document.querySelector('[contenteditable="true"]');
@@ -443,7 +451,6 @@ class WazzupAIAssistant {
     if (!inputField) {
       console.error('❌ Поле ввода не найдено');
       
-      // Показываем все contenteditable элементы для отладки
       const allEditable = document.querySelectorAll('[contenteditable="true"]');
       console.log('Найдено contenteditable элементов:', allEditable.length);
       allEditable.forEach((el, i) => {
@@ -456,11 +463,9 @@ class WazzupAIAssistant {
 
     console.log('✅ Поле ввода найдено:', inputField.className);
 
-    // Очищаем и вставляем текст
     inputField.innerHTML = '';
     inputField.textContent = text;
     
-    // Эмулируем события
     inputField.dispatchEvent(new Event('input', { bubbles: true }));
     inputField.dispatchEvent(new Event('change', { bubbles: true }));
     inputField.focus();
