@@ -304,7 +304,7 @@ class WazzupAIAssistant {
           context,
           settings: {
             apiKey: this.apiKey,
-            model: settings.model || 'gpt-5', // На фронте показываем GPT-5
+            model: settings.model || 'gpt-5',
             customPrompt: settings.customPrompt || '',
             temperature: settings.temperature || 0.7,
             maxTokens: settings.maxTokens || 800
@@ -314,6 +314,14 @@ class WazzupAIAssistant {
       
       console.log('📤 Отправка сообщения в background:', messageData);
       
+      // НОВОЕ: Проверяем, что runtime существует
+      if (!chrome.runtime?.id) {
+        console.error('❌ Chrome runtime недоступен');
+        this.showError('Расширение не инициализировано. Перезагрузите страницу.');
+        this.isGenerating = false;
+        return;
+      }
+      
       // Создаём таймаут на 30 секунд
       const timeoutId = setTimeout(() => {
         console.error('⏱️ ТАЙМАУТ! Ответ не получен за 30 секунд');
@@ -321,37 +329,52 @@ class WazzupAIAssistant {
         this.isGenerating = false;
       }, 30000);
       
-      // Отправляем запрос через background script
-      chrome.runtime.sendMessage(messageData, (response) => {
+      // НОВОЕ: Оборачиваем в try-catch
+      try {
+        // Отправляем запрос через background script
+        chrome.runtime.sendMessage(messageData, (response) => {
+          clearTimeout(timeoutId);
+          
+          console.log('📥 Callback вызван');
+          console.log('📥 Ответ получен:', response);
+          console.log('📥 chrome.runtime.lastError:', chrome.runtime.lastError);
+          
+          if (chrome.runtime.lastError) {
+            console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
+            
+            // НОВОЕ: Специальная обработка ошибки "Receiving end does not exist"
+            if (chrome.runtime.lastError.message.includes('Receiving end does not exist')) {
+              this.showError('Service Worker неактивен. Обновите расширение в chrome://extensions/ и перезагрузите страницу (F5)');
+            } else {
+              this.showError('Ошибка связи: ' + chrome.runtime.lastError.message);
+            }
+            this.isGenerating = false;
+            return;
+          }
+          
+          if (!response) {
+            console.error('❌ Пустой ответ от background script');
+            this.showError('Пустой ответ. Проверьте консоль Service Worker в chrome://extensions/');
+            this.isGenerating = false;
+            return;
+          }
+          
+          if (response.success) {
+            console.log('✅ Успешно получены варианты:', response.variants);
+            this.displayResponses(response.variants);
+          } else {
+            console.error('❌ Ошибка в ответе:', response.error);
+            this.showError('Ошибка: ' + response.error);
+          }
+          this.isGenerating = false;
+        });
+      } catch (runtimeError) {
         clearTimeout(timeoutId);
-        
-        console.log('📥 Callback вызван');
-        console.log('📥 Ответ получен:', response);
-        console.log('📥 chrome.runtime.lastError:', chrome.runtime.lastError);
-        
-        if (chrome.runtime.lastError) {
-          console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
-          this.showError('Ошибка связи с расширением: ' + chrome.runtime.lastError.message);
-          this.isGenerating = false;
-          return;
-        }
-        
-        if (!response) {
-          console.error('❌ Пустой ответ от background script');
-          this.showError('Не получен ответ от background script. Проверьте консоль background script (chrome://extensions).');
-          this.isGenerating = false;
-          return;
-        }
-        
-        if (response.success) {
-          console.log('✅ Успешно получены варианты:', response.variants);
-          this.displayResponses(response.variants);
-        } else {
-          console.error('❌ Ошибка в ответе:', response.error);
-          this.showError('Ошибка: ' + response.error);
-        }
+        console.error('❌ Ошибка отправки сообщения:', runtimeError);
+        this.showError('Не удалось отправить сообщение. Перезагрузите расширение.');
         this.isGenerating = false;
-      });
+        return;
+      }
       
       console.log('✅ Сообщение отправлено, ждём ответа...');
       
