@@ -3,7 +3,7 @@
 #wazzup-ai-panel {
   position: fixed;
   right: 20px;
-  bottom: 20px;
+  bottom: 120px; /* ИЗМЕНЕНО: было 20px, стало 120px */
   width: 400px;
   max-height: 600px;
   background: white;
@@ -48,13 +48,48 @@
   font-size: 20px;
 }
 
-.wai-close {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  font-size: 20px;
+/* НОВОЕ: Контейнер для кнопок в header */
+.wai-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* НОВОЕ: Кнопка обновления */
+.wai-refresh {
   width: 30px;
   height: 30px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  line-height: 0;
+  padding: 0;
+}
+
+.wai-refresh:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: rotate(180deg);
+}
+
+.wai-refresh:active {
+  transform: rotate(180deg) scale(0.9);
+}
+
+/* ОБНОВЛЕНО: Кнопка закрытия */
+.wai-close {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 20px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -247,7 +282,7 @@
 @media (max-width: 768px) {
   #wazzup-ai-panel {
     right: 10px;
-    bottom: 10px;
+    bottom: 120px; /* ИЗМЕНЕНО: было 10px, стало 120px */
     width: calc(100vw - 20px);
     max-width: 400px;
   }
@@ -284,5 +319,10 @@
 
   .wai-empty p {
     color: #aaa;
+  }
+  
+  /* НОВОЕ: Темная тема для кнопки обновления */
+  .wai-refresh:hover {
+    background: rgba(255, 255, 255, 0.15);
   }
 }
