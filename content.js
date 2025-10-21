@@ -305,10 +305,10 @@ class WazzupAIAssistant {
           context,
           settings: {
             apiKey: this.apiKey,
-            model: settings.model || 'gpt-4',
+            model: settings.model || 'gpt-5', // На фронте показываем GPT-5
             customPrompt: settings.customPrompt || '',
             temperature: settings.temperature || 0.7,
-            maxTokens: settings.maxTokens || 500
+            maxTokens: settings.maxTokens || 800
           }
         }
       };
@@ -364,25 +364,42 @@ class WazzupAIAssistant {
   }
 
   getConversationContext() {
-    // Получаем последние 5 сообщений для контекста
+    // Получаем ВСЕ сообщения из чата
     const messages = [];
     const allMessages = document.querySelectorAll('.body-messages-item, [class*="message-item"]');
     
-    // Берём последние 5 сообщений
-    const recentMessages = Array.from(allMessages).slice(-5);
+    console.log(`📊 Всего сообщений в чате: ${allMessages.length}`);
     
-    recentMessages.forEach((msgEl) => {
+    // Берём ПОСЛЕДНИЕ 50 сообщений (самые свежие)
+    const recentMessages = Array.from(allMessages).slice(-50);
+    
+    console.log(`📊 Берём последние ${recentMessages.length} сообщений`);
+    
+    recentMessages.forEach((msgEl, index) => {
       const isIncoming = msgEl.classList.contains('incoming') || 
                         msgEl.querySelector('[class*="incoming"]');
       const textEl = msgEl.querySelector('[dir="auto"], .body-text, [class*="text"]');
       
       if (textEl) {
+        const messageText = textEl.textContent.trim();
         messages.push({
           role: isIncoming ? 'client' : 'manager',
-          text: textEl.textContent.trim()
+          text: messageText,
+          index: index + 1 // Порядковый номер для отладки
         });
       }
     });
+    
+    console.log('📝 Контекст сформирован:');
+    console.log(`   - Всего сообщений: ${messages.length}`);
+    console.log(`   - От клиента: ${messages.filter(m => m.role === 'client').length}`);
+    console.log(`   - От менеджера: ${messages.filter(m => m.role === 'manager').length}`);
+    
+    // Находим последнее сообщение от клиента
+    const lastClientMessage = messages.filter(m => m.role === 'client').pop();
+    if (lastClientMessage) {
+      console.log(`   - Последнее сообщение клиента: "${lastClientMessage.text.substring(0, 50)}..."`);
+    }
     
     return messages;
   }
