@@ -21,11 +21,11 @@ chrome.runtime.onInstalled.addListener((details) => {
     chrome.storage.sync.set({
       enabled: true,
       apiKey: '',
-      model: 'gpt-4o', // По умолчанию gpt-4o
+      model: 'gpt-4o',
       customPrompt: '',
       temperature: 0.7,
-      maxTokens: 800, // Увеличил для более длинных ответов
-      contextMessages: 50 // Увеличил до 50
+      maxTokens: 800,
+      contextMessages: 50
     });
     
   } else if (details.reason === 'update') {
@@ -40,6 +40,13 @@ let generationCount = 0;
 
 // Обработка сообщений от content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // НОВОЕ: Обработка PING для пробуждения Service Worker
+  if (message.type === 'PING') {
+    console.log('🏓 PING получен, Service Worker активен');
+    sendResponse({ pong: true });
+    return true;
+  }
+  
   console.log('🔔 ЛЮБОЕ сообщение получено!');
   console.log('📨 Тип сообщения:', message.type);
   console.log('📨 Полное сообщение:', message);
