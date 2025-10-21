@@ -9,10 +9,11 @@ class WazzupAIAssistant {
     this.lastMessageText = '';
     this.messageObserver = null;
     this.lastProcessedChatId = null;
+    this.keepAlivePort = null;
     
-    // Селекторы для Wazzup24
+    // Селекторы для Wazzup24 (ОБНОВЛЕНО!)
     this.selectors = {
-      chatInput: '.chat-input-text[contenteditable="true"]',
+      chatInput: '.chat-input[contenteditable="true"]', // ИСПРАВЛЕНО!
       messagesList: '.body-messages-list',
       incomingMessage: '.body-messages-item.incoming',
       messageText: '.body-text-message.body-text div[dir="auto"]',
@@ -237,7 +238,6 @@ class WazzupAIAssistant {
       chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
         if (chrome.runtime.lastError) {
           console.log('⚠️ Service Worker спит, пробуем разбудить...');
-          // Повторная попытка через 100ms
           setTimeout(() => {
             chrome.runtime.sendMessage({ type: 'PING' }, () => {
               resolve();
@@ -271,7 +271,7 @@ class WazzupAIAssistant {
     this.showLoading();
 
     try {
-      // НОВОЕ: Сначала будим Service Worker
+      // Сначала будим Service Worker
       await this.wakeUpServiceWorker();
       
       const context = this.getConversationContext();
@@ -431,15 +431,38 @@ class WazzupAIAssistant {
     console.log('✅ Варианты ответов отображены');
   }
 
+  // ИСПРАВЛЕНО!
   insertResponse(text) {
-    const inputField = document.querySelector(this.selectors.chatInput);
+    // Пробуем разные селекторы для поля ввода
+    const inputField = 
+      document.querySelector('.chat-input[contenteditable="true"]') || // НОВЫЙ!
+      document.querySelector('.chat-input') ||
+      document.querySelector('.chat-input-text[contenteditable="true"]') ||
+      document.querySelector('[contenteditable="true"]');
+    
     if (!inputField) {
+      console.error('❌ Поле ввода не найдено');
+      
+      // Показываем все contenteditable элементы для отладки
+      const allEditable = document.querySelectorAll('[contenteditable="true"]');
+      console.log('Найдено contenteditable элементов:', allEditable.length);
+      allEditable.forEach((el, i) => {
+        console.log(`${i + 1}. Класс: "${el.className}", Тег: ${el.tagName}`);
+      });
+      
       this.showError('Поле ввода не найдено');
       return;
     }
 
+    console.log('✅ Поле ввода найдено:', inputField.className);
+
+    // Очищаем и вставляем текст
+    inputField.innerHTML = '';
     inputField.textContent = text;
+    
+    // Эмулируем события
     inputField.dispatchEvent(new Event('input', { bubbles: true }));
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
     inputField.focus();
 
     console.log('✅ Текст вставлен в поле ввода');
