@@ -8,7 +8,7 @@ class WazzupAIAssistant {
     this.isGenerating = false;
     this.lastMessageText = '';
     this.messageObserver = null;
-    this.lastProcessedChatId = null; // Для отслеживания смены чата
+    this.lastProcessedChatId = null;
     
     // Селекторы для Wazzup24
     this.selectors = {
@@ -51,7 +51,6 @@ class WazzupAIAssistant {
   setup() {
     console.log('🔧 Настройка интерфейса...');
     
-    // Проверяем, что мы на странице чата (пробуем разные селекторы)
     const chatContainer = 
       document.querySelector(this.selectors.chatContainer) ||
       document.querySelector('[class*="body-messages"]') ||
@@ -68,23 +67,15 @@ class WazzupAIAssistant {
 
     console.log('✅ Контейнер чата найден:', chatContainer.className || chatContainer.tagName);
 
-    // Создаём панель с вариантами ответов
     this.createPanel();
-    
-    // Следим за новыми сообщениями
     this.watchMessages();
-    
-    // Следим за сменой чата
     this.watchChatChanges();
-    
-    // Анализируем последнее сообщение при загрузке
     this.checkLastMessage();
     
     console.log('✅ Расширение готово к работе');
   }
 
   createPanel() {
-    // Проверяем, не создана ли уже панель
     if (document.getElementById('wazzup-ai-panel')) {
       console.log('ℹ️ Панель уже существует');
       return;
@@ -108,11 +99,9 @@ class WazzupAIAssistant {
       </div>
     `;
 
-    // Добавляем панель в DOM
     document.body.appendChild(panel);
     this.panel = panel;
 
-    // Обработчик кнопки закрытия
     panel.querySelector('.wai-close').addEventListener('click', () => {
       panel.classList.toggle('wai-minimized');
     });
@@ -120,11 +109,9 @@ class WazzupAIAssistant {
     console.log('🎨 Панель создана и добавлена в DOM');
   }
 
-  // Проверка последнего сообщения при загрузке чата
   checkLastMessage() {
     console.log('🔍 Проверка последнего входящего сообщения...');
     
-    // Ищем все входящие сообщения
     const incomingMessages = document.querySelectorAll(
       '.body-messages-item.incoming, [class*="incoming"]'
     );
@@ -135,43 +122,37 @@ class WazzupAIAssistant {
       return;
     }
     
-    // Берём последнее входящее сообщение
     const lastIncoming = incomingMessages[incomingMessages.length - 1];
     console.log('✅ Найдено последнее входящее сообщение');
     
-    // Обрабатываем его
     this.onNewIncomingMessage(lastIncoming, true);
   }
 
-  // Отслеживание смены чата
   watchChatChanges() {
     console.log('👀 Начинаем отслеживать смену чата...');
     
-    // Следим за изменением URL
     let lastUrl = location.href;
     new MutationObserver(() => {
       const url = location.href;
       if (url !== lastUrl) {
         console.log('🔄 URL изменился, чат переключен');
         lastUrl = url;
-        this.lastMessageText = ''; // Сбрасываем последнее сообщение
+        this.lastMessageText = '';
         this.lastProcessedChatId = null;
         
-        // Проверяем последнее сообщение в новом чате
         setTimeout(() => this.checkLastMessage(), 1000);
       }
     }).observe(document, { subtree: true, childList: true });
   }
 
   watchMessages() {
-    // Ищем родительский контейнер всех сообщений
     const messagesList = 
       document.querySelector('.body-messages-list') ||
       document.querySelector('[class*="messages-list"]') ||
       document.querySelector('[class*="chat-messages"]') ||
       document.querySelector('.chat-body-wrapper') ||
       document.querySelector('.message-item-hover')?.parentElement ||
-      document.body; // в крайнем случае следим за всем body
+      document.body;
     
     if (!messagesList) {
       console.log('⏳ Список сообщений не найден, повтор через 2 сек...');
@@ -181,14 +162,11 @@ class WazzupAIAssistant {
 
     console.log('✅ Список сообщений найден:', messagesList.className || messagesList.tagName);
 
-    // Создаём наблюдатель за изменениями DOM
     this.messageObserver = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.addedNodes.length > 0) {
-          // Проверяем, добавлено ли входящее сообщение
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1 && node.querySelector) {
-              // Ищем входящие сообщения
               const incomingMsg = 
                 node.querySelector('.body-messages-item.incoming') ||
                 (node.classList && node.classList.contains('incoming') ? node : null) ||
@@ -214,7 +192,6 @@ class WazzupAIAssistant {
   onNewIncomingMessage(messageElement, isInitial = false) {
     console.log('🔔 Обнаружено входящее сообщение', isInitial ? '(при загрузке)' : '(новое)');
     
-    // Получаем текст сообщения (пробуем разные селекторы)
     const textElement = 
       messageElement.querySelector(this.selectors.messageText) ||
       messageElement.querySelector('[dir="auto"]') ||
@@ -223,29 +200,21 @@ class WazzupAIAssistant {
       
     if (!textElement) {
       console.log('⚠️ Текст сообщения не найден');
-      if (isInitial) {
-        this.showEmptyState();
-      }
+      if (isInitial) this.showEmptyState();
       return;
     }
 
     const messageText = textElement.textContent.trim();
     
-    // Игнорируем пустые сообщения и дубликаты
     if (!messageText) {
       console.log('ℹ️ Сообщение пустое');
-      if (isInitial) {
-        this.showEmptyState();
-      }
+      if (isInitial) this.showEmptyState();
       return;
     }
     
-    // Для начального сообщения или если текст изменился
     if (isInitial || messageText !== this.lastMessageText) {
       this.lastMessageText = messageText;
       console.log('📨 Сообщение для обработки:', messageText);
-
-      // Генерируем варианты ответов
       this.generateResponses(messageText);
     } else {
       console.log('ℹ️ Дубликат сообщения, игнорируем');
@@ -260,6 +229,26 @@ class WazzupAIAssistant {
         <small>Когда клиент напишет, я предложу варианты ответов</small>
       </div>
     `;
+  }
+
+  // НОВОЕ: Метод для пробуждения Service Worker
+  async wakeUpServiceWorker() {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.log('⚠️ Service Worker спит, пробуем разбудить...');
+          // Повторная попытка через 100ms
+          setTimeout(() => {
+            chrome.runtime.sendMessage({ type: 'PING' }, () => {
+              resolve();
+            });
+          }, 100);
+        } else {
+          console.log('✅ Service Worker активен');
+          resolve();
+        }
+      });
+    });
   }
 
   async generateResponses(clientMessage) {
@@ -282,11 +271,12 @@ class WazzupAIAssistant {
     this.showLoading();
 
     try {
-      // Получаем контекст последних сообщений
+      // НОВОЕ: Сначала будим Service Worker
+      await this.wakeUpServiceWorker();
+      
       const context = this.getConversationContext();
       console.log('📝 Контекст получен:', context);
       
-      // Получаем настройки из storage
       const settings = await chrome.storage.sync.get([
         'model',
         'customPrompt',
@@ -314,67 +304,41 @@ class WazzupAIAssistant {
       
       console.log('📤 Отправка сообщения в background:', messageData);
       
-      // НОВОЕ: Проверяем, что runtime существует
-      if (!chrome.runtime?.id) {
-        console.error('❌ Chrome runtime недоступен');
-        this.showError('Расширение не инициализировано. Перезагрузите страницу.');
-        this.isGenerating = false;
-        return;
-      }
-      
-      // Создаём таймаут на 30 секунд
       const timeoutId = setTimeout(() => {
         console.error('⏱️ ТАЙМАУТ! Ответ не получен за 30 секунд');
         this.showError('Превышено время ожидания ответа от сервера');
         this.isGenerating = false;
       }, 30000);
       
-      // НОВОЕ: Оборачиваем в try-catch
-      try {
-        // Отправляем запрос через background script
-        chrome.runtime.sendMessage(messageData, (response) => {
-          clearTimeout(timeoutId);
-          
-          console.log('📥 Callback вызван');
-          console.log('📥 Ответ получен:', response);
-          console.log('📥 chrome.runtime.lastError:', chrome.runtime.lastError);
-          
-          if (chrome.runtime.lastError) {
-            console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
-            
-            // НОВОЕ: Специальная обработка ошибки "Receiving end does not exist"
-            if (chrome.runtime.lastError.message.includes('Receiving end does not exist')) {
-              this.showError('Service Worker неактивен. Обновите расширение в chrome://extensions/ и перезагрузите страницу (F5)');
-            } else {
-              this.showError('Ошибка связи: ' + chrome.runtime.lastError.message);
-            }
-            this.isGenerating = false;
-            return;
-          }
-          
-          if (!response) {
-            console.error('❌ Пустой ответ от background script');
-            this.showError('Пустой ответ. Проверьте консоль Service Worker в chrome://extensions/');
-            this.isGenerating = false;
-            return;
-          }
-          
-          if (response.success) {
-            console.log('✅ Успешно получены варианты:', response.variants);
-            this.displayResponses(response.variants);
-          } else {
-            console.error('❌ Ошибка в ответе:', response.error);
-            this.showError('Ошибка: ' + response.error);
-          }
-          this.isGenerating = false;
-        });
-      } catch (runtimeError) {
+      chrome.runtime.sendMessage(messageData, (response) => {
         clearTimeout(timeoutId);
-        console.error('❌ Ошибка отправки сообщения:', runtimeError);
-        this.showError('Не удалось отправить сообщение. Перезагрузите расширение.');
+        
+        console.log('📥 Callback вызван');
+        console.log('📥 Ответ получен:', response);
+        
+        if (chrome.runtime.lastError) {
+          console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
+          this.showError('Ошибка связи: ' + chrome.runtime.lastError.message);
+          this.isGenerating = false;
+          return;
+        }
+        
+        if (!response) {
+          console.error('❌ Пустой ответ от background script');
+          this.showError('Пустой ответ. Перезагрузите расширение.');
+          this.isGenerating = false;
+          return;
+        }
+        
+        if (response.success) {
+          console.log('✅ Успешно получены варианты:', response.variants);
+          this.displayResponses(response.variants);
+        } else {
+          console.error('❌ Ошибка в ответе:', response.error);
+          this.showError('Ошибка: ' + response.error);
+        }
         this.isGenerating = false;
-        return;
-      }
+      });
       
       console.log('✅ Сообщение отправлено, ждём ответа...');
       
@@ -386,13 +350,11 @@ class WazzupAIAssistant {
   }
 
   getConversationContext() {
-    // Получаем ВСЕ сообщения из чата
     const messages = [];
     const allMessages = document.querySelectorAll('.body-messages-item, [class*="message-item"]');
     
     console.log(`📊 Всего сообщений в чате: ${allMessages.length}`);
     
-    // Берём ПОСЛЕДНИЕ 50 сообщений (самые свежие)
     const recentMessages = Array.from(allMessages).slice(-50);
     
     console.log(`📊 Берём последние ${recentMessages.length} сообщений`);
@@ -407,7 +369,7 @@ class WazzupAIAssistant {
         messages.push({
           role: isIncoming ? 'client' : 'manager',
           text: messageText,
-          index: index + 1 // Порядковый номер для отладки
+          index: index + 1
         });
       }
     });
@@ -417,7 +379,6 @@ class WazzupAIAssistant {
     console.log(`   - От клиента: ${messages.filter(m => m.role === 'client').length}`);
     console.log(`   - От менеджера: ${messages.filter(m => m.role === 'manager').length}`);
     
-    // Находим последнее сообщение от клиента
     const lastClientMessage = messages.filter(m => m.role === 'client').pop();
     if (lastClientMessage) {
       console.log(`   - Последнее сообщение клиента: "${lastClientMessage.text.substring(0, 50)}..."`);
@@ -456,7 +417,6 @@ class WazzupAIAssistant {
         </div>
       `;
 
-      // Обработчики кнопок
       suggestionEl.querySelector('.wai-btn-insert').addEventListener('click', () => {
         this.insertResponse(response.text);
       });
@@ -478,10 +438,7 @@ class WazzupAIAssistant {
       return;
     }
 
-    // Вставляем текст
     inputField.textContent = text;
-    
-    // Эмулируем событие input для корректной работы Wazzup
     inputField.dispatchEvent(new Event('input', { bubbles: true }));
     inputField.focus();
 
@@ -491,7 +448,6 @@ class WazzupAIAssistant {
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
-    // Ждём немного и кликаем на кнопку отправки
     setTimeout(() => {
       const sendBtn = document.querySelector(this.selectors.sendButton);
       if (sendBtn) {
