@@ -11,7 +11,7 @@ class WazzupAIAssistant {
     this.lastProcessedChatId = null;
     this.keepAlivePort = null;
     this.currentView = 'responses';
-    this.panelPosition = 100;
+    this.panelPosition = 100; // ИСПРАВЛЕНО: начальный отступ 100px
     this.systemPrompt = '';
     
     // Селекторы для Wazzup24
@@ -217,20 +217,20 @@ class WazzupAIAssistant {
     document.body.appendChild(panel);
     this.panel = panel;
 
-    // ИСПРАВЛЕНИЕ: Устанавливаем промпт через JavaScript после добавления в DOM
+    // Устанавливаем промпт через JavaScript после добавления в DOM
     const textarea = panel.querySelector('.wai-prompt-textarea');
     if (textarea) {
       textarea.value = this.systemPrompt;
       console.log('✅ Промпт установлен в textarea, длина:', this.systemPrompt.length);
     }
 
-    // Обработчики кнопок перемещения
+    // ИСПРАВЛЕНО: правильная логика кнопок
     panel.querySelector('.wai-move-up').addEventListener('click', () => {
-      this.movePanel(-25);
+      this.movePanel(25); // вверх = увеличиваем bottom
     });
 
     panel.querySelector('.wai-move-down').addEventListener('click', () => {
-      this.movePanel(25);
+      this.movePanel(-25); // вниз = уменьшаем bottom
     });
 
     // Обработчик кнопки обновления
@@ -687,7 +687,6 @@ class WazzupAIAssistant {
 
     console.log('✅ Поле ввода найдено:', inputField.className);
 
-    // ИСПРАВЛЕНИЕ: Не трогаем фокус если пользователь уже редактирует
     const isUserEditing = document.activeElement === inputField;
 
     inputField.innerHTML = '';
@@ -696,7 +695,6 @@ class WazzupAIAssistant {
     inputField.dispatchEvent(new Event('input', { bubbles: true }));
     inputField.dispatchEvent(new Event('change', { bubbles: true }));
     
-    // Фокус только если пользователь НЕ редактирует
     if (!isUserEditing) {
       inputField.focus();
     }
