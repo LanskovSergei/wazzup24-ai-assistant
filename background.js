@@ -22,7 +22,6 @@ chrome.runtime.onInstalled.addListener((details) => {
       enabled: true,
       apiKey: '',
       model: 'gpt-4o',
-      customPrompt: '',
       temperature: 0.7,
       maxTokens: 800,
       contextMessages: 50
@@ -40,7 +39,7 @@ let generationCount = 0;
 
 // Обработка сообщений от content script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // НОВОЕ: Обработка PING для пробуждения Service Worker
+  // Обработка PING для пробуждения Service Worker
   if (message.type === 'PING') {
     console.log('🏓 PING получен, Service Worker активен');
     sendResponse({ pong: true });
@@ -91,7 +90,7 @@ async function handleGetSettings(sendResponse) {
       'enabled',
       'apiKey',
       'model',
-      'customPrompt',
+      'systemPrompt',
       'temperature',
       'maxTokens',
       'contextMessages'
@@ -126,10 +125,10 @@ async function handleGenerateResponses(data, sendResponse) {
     console.log('🤖 Генерация ответов для:', clientMessage);
     
     // Формируем промпт
-    const prompt = buildPrompt(clientMessage, context, settings.customPrompt);
+    const prompt = buildPrompt(clientMessage, context);
     console.log('📝 Промпт сформирован, длина:', prompt.length);
     
-    // Используем gpt-4o вместо выбранной модели
+    // Используем gpt-4o
     const actualModel = 'gpt-4o';
     
     const requestBody = {
@@ -137,7 +136,7 @@ async function handleGenerateResponses(data, sendResponse) {
       messages: [
         {
           role: 'system',
-          content: getSystemPrompt(settings.customPrompt)
+          content: settings.systemPrompt || getDefaultPrompt()
         },
         {
           role: 'user',
@@ -152,6 +151,7 @@ async function handleGenerateResponses(data, sendResponse) {
     console.log('📤 Модель:', actualModel);
     console.log('📤 Temperature:', requestBody.temperature);
     console.log('📤 Max tokens:', requestBody.max_tokens);
+    console.log('📤 Системный промпт длина:', requestBody.messages[0].content.length);
     
     // Запрос к OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -206,9 +206,9 @@ async function handleGenerateResponses(data, sendResponse) {
   }
 }
 
-// Системный промпт
-function getSystemPrompt(customPrompt) {
-  let systemPrompt = `Ты — менеджер магазина DJI Market.
+// Default промпт (используется если кастомный не задан)
+function getDefaultPrompt() {
+  return `Ты — менеджер магазина DJI Market.
 
 ВАЖНЫЕ ПРАВИЛА ОБРАЩЕНИЯ:
 - Всегда обращайся на "Вы" (с большой буквы): "Вы", "Вам", "Вас", "Ваш"
@@ -270,16 +270,10 @@ function getSystemPrompt(customPrompt) {
 - В КАЖДОМ варианте должен быть элемент, продолжающий диалог (вопрос, предложение, рекомендация)
 - НЕ закрывай диалог фразами типа "Обращайтесь!" или "Всего доброго!"
 - Будь проактивным, но не навязчивым`;
-
-  if (customPrompt) {
-    systemPrompt += `\n\nДОПОЛНИТЕЛЬНЫЕ ИНСТРУКЦИИ:\n${customPrompt}`;
-  }
-
-  return systemPrompt;
 }
 
 // Построение промпта для GPT
-function buildPrompt(clientMessage, context, customPrompt) {
+function buildPrompt(clientMessage, context) {
   let prompt = '';
 
   // Добавляем контекст переписки (до 50 сообщений)
