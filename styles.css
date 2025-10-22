@@ -3,17 +3,17 @@
 #wazzup-ai-panel {
   position: fixed;
   right: 20px;
-  bottom: 120px; /* ИЗМЕНЕНО: было 20px, стало 120px */
-  width: 400px;
-  max-height: 600px;
+  bottom: 100px; /* Динамически меняется через JS */
+  width: 420px;
+  height: 680px; /* Фиксированная высота */
   background: white;
-  border-radius: 12px;
+  border-radius: 16px; /* Скругленные углы со всех сторон */
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
   z-index: 999999;
   display: flex;
   flex-direction: column;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  transition: all 0.3s ease;
+  transition: bottom 0.3s ease;
 }
 
 #wazzup-ai-panel.wai-minimized {
@@ -21,7 +21,8 @@
   overflow: hidden;
 }
 
-#wazzup-ai-panel.wai-minimized .wai-content {
+#wazzup-ai-panel.wai-minimized .wai-content,
+#wazzup-ai-panel.wai-minimized .wai-tabs {
   display: none;
 }
 
@@ -32,8 +33,9 @@
   align-items: center;
   padding: 15px 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  border-radius: 12px 12px 0 0;
+  border-radius: 16px 16px 0 0;
   color: white;
+  flex-shrink: 0;
 }
 
 .wai-title {
@@ -48,22 +50,52 @@
   font-size: 20px;
 }
 
-/* НОВОЕ: Контейнер для кнопок в header */
+/* Контейнер для кнопок в header */
 .wai-header-actions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
 }
 
-/* НОВОЕ: Кнопка обновления */
-.wai-refresh {
-  width: 30px;
-  height: 30px;
+/* Кнопки перемещения */
+.wai-move-up,
+.wai-move-down {
+  width: 28px;
+  height: 28px;
   border: none;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   cursor: pointer;
-  font-size: 16px;
+  font-size: 14px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 0;
+  padding: 0;
+}
+
+.wai-move-up:hover,
+.wai-move-down:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+.wai-move-up:active,
+.wai-move-down:active {
+  transform: scale(0.95);
+}
+
+/* Кнопка обновления */
+.wai-refresh {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
   color: white;
   display: flex;
   align-items: center;
@@ -82,10 +114,10 @@
   transform: rotate(180deg) scale(0.9);
 }
 
-/* ОБНОВЛЕНО: Кнопка закрытия */
+/* Кнопка закрытия */
 .wai-close {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: none;
   background: rgba(255, 255, 255, 0.2);
   color: white;
@@ -104,12 +136,66 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* Вкладки */
+.wai-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 2px solid #e9ecef;
+  flex-shrink: 0;
+}
+
+.wai-tab {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.wai-tab:hover {
+  background: rgba(102, 126, 234, 0.05);
+  color: #667eea;
+}
+
+.wai-tab-active {
+  color: #667eea;
+  font-weight: 600;
+}
+
+.wai-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #667eea;
+}
+
 /* Контент панели */
 .wai-content {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Виды контента */
+.wai-view {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
   padding: 15px;
-  max-height: 550px;
+}
+
+.wai-view-active {
+  display: flex;
+  flex-direction: column;
 }
 
 /* Состояние ожидания */
@@ -238,6 +324,62 @@
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
+/* Редактор промпта */
+.wai-prompt-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.wai-prompt-textarea {
+  flex: 1;
+  padding: 15px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  line-height: 1.6;
+  resize: none;
+  margin-bottom: 15px;
+}
+
+.wai-prompt-textarea:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.wai-prompt-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.wai-btn-save-prompt,
+.wai-btn-reset-prompt {
+  flex: 1;
+}
+
+.wai-btn-save-prompt {
+  background: #667eea;
+  color: white;
+}
+
+.wai-btn-save-prompt:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.wai-btn-reset-prompt {
+  background: white;
+  color: #666;
+  border: 2px solid #e9ecef;
+}
+
+.wai-btn-reset-prompt:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
 /* Ошибка */
 .wai-error {
   padding: 20px;
@@ -260,21 +402,29 @@
 }
 
 /* Скроллбар */
-.wai-content::-webkit-scrollbar {
+.wai-content::-webkit-scrollbar,
+.wai-view::-webkit-scrollbar,
+.wai-prompt-textarea::-webkit-scrollbar {
   width: 6px;
 }
 
-.wai-content::-webkit-scrollbar-track {
+.wai-content::-webkit-scrollbar-track,
+.wai-view::-webkit-scrollbar-track,
+.wai-prompt-textarea::-webkit-scrollbar-track {
   background: #f1f1f1;
   border-radius: 3px;
 }
 
-.wai-content::-webkit-scrollbar-thumb {
+.wai-content::-webkit-scrollbar-thumb,
+.wai-view::-webkit-scrollbar-thumb,
+.wai-prompt-textarea::-webkit-scrollbar-thumb {
   background: #ccc;
   border-radius: 3px;
 }
 
-.wai-content::-webkit-scrollbar-thumb:hover {
+.wai-content::-webkit-scrollbar-thumb:hover,
+.wai-view::-webkit-scrollbar-thumb:hover,
+.wai-prompt-textarea::-webkit-scrollbar-thumb:hover {
   background: #999;
 }
 
@@ -282,20 +432,37 @@
 @media (max-width: 768px) {
   #wazzup-ai-panel {
     right: 10px;
-    bottom: 120px; /* ИЗМЕНЕНО: было 10px, стало 120px */
     width: calc(100vw - 20px);
-    max-width: 400px;
+    max-width: 420px;
   }
 }
 
-/* Тёмная тема (опционально) */
+/* Тёмная тема */
 @media (prefers-color-scheme: dark) {
   #wazzup-ai-panel {
     background: #1e1e1e;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
   }
 
-  .wai-content {
+  .wai-tabs {
+    background: #2a2a2a;
+    border-bottom-color: #3a3a3a;
+  }
+
+  .wai-tab {
+    color: #aaa;
+  }
+
+  .wai-tab:hover {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+  }
+
+  .wai-tab-active {
+    color: #667eea;
+  }
+
+  .wai-view {
     background: #1e1e1e;
   }
 
@@ -312,6 +479,16 @@
     color: #e0e0e0;
   }
 
+  .wai-prompt-textarea {
+    background: #2a2a2a;
+    border-color: #3a3a3a;
+    color: #e0e0e0;
+  }
+
+  .wai-prompt-textarea:focus {
+    border-color: #667eea;
+  }
+
   .wai-empty,
   .wai-loader {
     color: #999;
@@ -321,8 +498,9 @@
     color: #aaa;
   }
   
-  /* НОВОЕ: Темная тема для кнопки обновления */
-  .wai-refresh:hover {
+  .wai-refresh:hover,
+  .wai-move-up:hover,
+  .wai-move-down:hover {
     background: rgba(255, 255, 255, 0.15);
   }
 }
