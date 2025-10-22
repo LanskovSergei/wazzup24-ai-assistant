@@ -10,6 +10,8 @@ class WazzupAIAssistant {
     this.messageObserver = null;
     this.lastProcessedChatId = null;
     this.keepAlivePort = null;
+    this.currentView = 'responses'; // 'responses' или 'prompt'
+    this.panelPosition = 100; // Позиция от низа в пикселях
     
     // Селекторы для Wazzup24
     this.selectors = {
@@ -28,6 +30,7 @@ class WazzupAIAssistant {
     console.log('📝 Инициализация расширения...');
     
     await this.loadSettings();
+    await this.loadPanelPosition();
     
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this.setup());
@@ -38,13 +41,96 @@ class WazzupAIAssistant {
 
   async loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get(['apiKey', 'enabled'], (data) => {
+      chrome.storage.sync.get(['apiKey', 'enabled', 'systemPrompt'], (data) => {
         this.apiKey = data.apiKey || null;
         this.enabled = data.enabled !== false;
+        this.systemPrompt = data.systemPrompt || this.getDefaultPrompt();
         console.log('⚙️ Настройки загружены:', { hasKey: !!this.apiKey, enabled: this.enabled });
         resolve();
       });
     });
+  }
+
+  async loadPanelPosition() {
+    return new Promise((resolve) => {
+      chrome.storage.local.get(['panelPosition'], (data) => {
+        if (data.panelPosition !== undefined) {
+          this.panelPosition = data.panelPosition;
+        }
+        console.log('📍 Позиция панели загружена:', this.panelPosition);
+        resolve();
+      });
+    });
+  }
+
+  savePanelPosition() {
+    chrome.storage.local.set({ panelPosition: this.panelPosition });
+    console.log('💾 Позиция панели сохранена:', this.panelPosition);
+  }
+
+  getDefaultPrompt() {
+    return `Ты — менеджер магазина DJI Market.
+
+ВАЖНЫЕ ПРАВИЛА ОБРАЩЕНИЯ:
+- Всегда обращайся на "Вы" (с большой буквы): "Вы", "Вам", "Вас", "Ваш"
+- Пиши вежливо, грамотно и по делу
+
+ТВОЯ РОЛЬ:
+Помогаешь клиентам выбрать и купить квадрокоптеры, камеры, стабилизаторы и аксессуары DJI.
+
+ИСТОЧНИК ИНФОРМАЦИИ:
+Используй только актуальные данные с сайта dji-market.ru — не придумывай характеристик и цен.
+
+ПРИ ОТВЕТЕ:
+1. Предлагай 1–3 подходящих модели с:
+   - Названием
+   - Ориентиром по цене
+   - Ссылкой на dji-market.ru
+2. Всегда указывай, что доставка по России бесплатная
+3. Пиши уверенно, с пользой для клиента: чем конкретная модель лучше и для кого она подходит
+4. ОБЯЗАТЕЛЬНО подталкивай к развитию диалога:
+   - Задавай уточняющие вопросы
+   - Предлагай дополнительные варианты
+   - Рекомендуй аксессуары или апгрейды
+   - Предлагай оформить КП или заказ
+   - Интересуйся опытом использования техники
+5. Поддерживай диалог вдумчиво, показывай экспертность
+
+РАБОТА С ВОЗРАЖЕНИЯМИ КЛИЕНТА:
+Когда клиент высказывает сомнения или возражения (например: "дорого", "не уверен", "видел дешевле", "а вдруг сломается"), отрабатывай их спокойно и уверенно:
+- "Дорого" / "Высокая цена" → Оригинальная продукция, официальная гарантия производителя, профессиональный сервис, бесплатная доставка
+- "Сомнения в качестве" → Только оригинал от DJI, официальная гарантия, сервисная поддержка по всей России
+- "Видел дешевле" → У нас 100% оригинал, бесплатная доставка, помощь в настройке, официальная гарантия
+- "Боюсь сломается" → Официальная гарантия производителя, наш сервисный центр, техподдержка 24/7
+- "Не уверен в выборе" → Помогу подобрать под Ваши задачи, расскажу о преимуществах каждой модели
+
+ЕСЛИ КЛИЕНТ СОМНЕВАЕТСЯ:
+- Помоги определиться с выбором через уточняющие вопросы
+- Предложи оформить коммерческое предложение (КП) с расчётом
+- Предложи оформить заказ с менеджером
+- Расскажи про трейд-ин или рассрочку (если уместно)
+
+ФОРМАТ ОТВЕТА:
+Сгенерируй 3 варианта ответа, КАЖДЫЙ из которых подталкивает к продолжению диалога:
+
+1. КОРОТКИЙ С ВОПРОСОМ (2-3 предложения)
+   - Краткий ответ на вопрос клиента
+   - Уточняющий вопрос для развития диалога
+
+2. ПОДРОБНЫЙ С РЕКОМЕНДАЦИЕЙ (3-5 предложений)
+   - Развёрнутый ответ с деталями
+   - Рекомендация конкретных моделей
+   - Предложение дополнительных опций или следующего шага
+
+3. ЭКСПЕРТНЫЙ С ПРЕДЛОЖЕНИЕМ (3-4 предложения)
+   - Экспертная рекомендация
+   - Обоснование выбора
+   - Конкретное предложение действия (оформить КП, заказ, консультацию)
+
+КРИТИЧЕСКИ ВАЖНО:
+- В КАЖДОМ варианте должен быть элемент, продолжающий диалог (вопрос, предложение, рекомендация)
+- НЕ закрывай диалог фразами типа "Обращайтесь!" или "Всего доброго!"
+- Будь проактивным, но не навязчивым`;
   }
 
   setup() {
@@ -67,6 +153,7 @@ class WazzupAIAssistant {
     console.log('✅ Контейнер чата найден:', chatContainer.className || chatContainer.tagName);
 
     this.createPanel();
+    this.updatePanelPosition();
     this.watchMessages();
     this.watchChatChanges();
     this.checkLastMessage();
@@ -89,20 +176,49 @@ class WazzupAIAssistant {
           AI Подсказки
         </div>
         <div class="wai-header-actions">
+          <button class="wai-move-up" title="Поднять вверх">⬆️</button>
+          <button class="wai-move-down" title="Опустить вниз">⬇️</button>
           <button class="wai-refresh" title="Обновить ответы">🔄</button>
           <button class="wai-close" title="Свернуть">&times;</button>
         </div>
       </div>
+      
+      <div class="wai-tabs">
+        <button class="wai-tab wai-tab-active" data-tab="responses">Ответы</button>
+        <button class="wai-tab" data-tab="prompt">Промпт</button>
+      </div>
+      
       <div class="wai-content">
-        <div class="wai-empty">
-          <p>Анализирую последнее сообщение...</p>
-          <small>Подождите, генерирую варианты ответов</small>
+        <div class="wai-view wai-view-responses wai-view-active">
+          <div class="wai-empty">
+            <p>Анализирую последнее сообщение...</p>
+            <small>Подождите, генерирую варианты ответов</small>
+          </div>
+        </div>
+        
+        <div class="wai-view wai-view-prompt">
+          <div class="wai-prompt-editor">
+            <textarea class="wai-prompt-textarea" placeholder="Введите системный промпт...">${this.systemPrompt}</textarea>
+            <div class="wai-prompt-actions">
+              <button class="wai-btn wai-btn-save-prompt">💾 Сохранить</button>
+              <button class="wai-btn wai-btn-reset-prompt">🔄 Сбросить</button>
+            </div>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(panel);
     this.panel = panel;
+
+    // Обработчики кнопок перемещения
+    panel.querySelector('.wai-move-up').addEventListener('click', () => {
+      this.movePanel(-25);
+    });
+
+    panel.querySelector('.wai-move-down').addEventListener('click', () => {
+      this.movePanel(25);
+    });
 
     // Обработчик кнопки обновления
     panel.querySelector('.wai-refresh').addEventListener('click', () => {
@@ -119,7 +235,93 @@ class WazzupAIAssistant {
       panel.classList.toggle('wai-minimized');
     });
 
+    // Обработчики вкладок
+    panel.querySelectorAll('.wai-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const tabName = tab.dataset.tab;
+        this.switchTab(tabName);
+      });
+    });
+
+    // Обработчики кнопок промпта
+    panel.querySelector('.wai-btn-save-prompt').addEventListener('click', () => {
+      this.savePrompt();
+    });
+
+    panel.querySelector('.wai-btn-reset-prompt').addEventListener('click', () => {
+      this.resetPrompt();
+    });
+
     console.log('🎨 Панель создана и добавлена в DOM');
+  }
+
+  movePanel(delta) {
+    this.panelPosition += delta;
+    
+    // Ограничения
+    const maxHeight = window.innerHeight - 700;
+    if (this.panelPosition < 20) this.panelPosition = 20;
+    if (this.panelPosition > maxHeight) this.panelPosition = maxHeight;
+    
+    this.updatePanelPosition();
+    this.savePanelPosition();
+  }
+
+  updatePanelPosition() {
+    if (this.panel) {
+      this.panel.style.bottom = `${this.panelPosition}px`;
+    }
+  }
+
+  switchTab(tabName) {
+    // Переключаем активную вкладку
+    this.panel.querySelectorAll('.wai-tab').forEach(tab => {
+      tab.classList.remove('wai-tab-active');
+      if (tab.dataset.tab === tabName) {
+        tab.classList.add('wai-tab-active');
+      }
+    });
+
+    // Переключаем видимость контента
+    this.panel.querySelectorAll('.wai-view').forEach(view => {
+      view.classList.remove('wai-view-active');
+    });
+    this.panel.querySelector(`.wai-view-${tabName}`).classList.add('wai-view-active');
+
+    this.currentView = tabName;
+  }
+
+  savePrompt() {
+    const textarea = this.panel.querySelector('.wai-prompt-textarea');
+    const newPrompt = textarea.value.trim();
+    
+    if (!newPrompt) {
+      alert('Промпт не может быть пустым');
+      return;
+    }
+
+    this.systemPrompt = newPrompt;
+    chrome.storage.sync.set({ systemPrompt: newPrompt }, () => {
+      alert('✅ Промпт сохранён успешно!');
+      console.log('💾 Промпт сохранён');
+    });
+  }
+
+  resetPrompt() {
+    if (!confirm('Сбросить промпт на значение по умолчанию?')) {
+      return;
+    }
+
+    const defaultPrompt = this.getDefaultPrompt();
+    this.systemPrompt = defaultPrompt;
+    
+    const textarea = this.panel.querySelector('.wai-prompt-textarea');
+    textarea.value = defaultPrompt;
+
+    chrome.storage.sync.set({ systemPrompt: defaultPrompt }, () => {
+      alert('✅ Промпт сброшен на default!');
+      console.log('🔄 Промпт сброшен');
+    });
   }
 
   checkLastMessage() {
@@ -235,7 +437,7 @@ class WazzupAIAssistant {
   }
 
   showEmptyState() {
-    const content = this.panel.querySelector('.wai-content');
+    const content = this.panel.querySelector('.wai-view-responses');
     content.innerHTML = `
       <div class="wai-empty">
         <p>Нет входящих сообщений</p>
@@ -287,214 +489,7 @@ class WazzupAIAssistant {
       const context = this.getConversationContext();
       console.log('📝 Контекст получен:', context);
       
-      const settings = await chrome.storage.sync.get([
-        'model',
-        'customPrompt',
-        'temperature',
-        'maxTokens',
-        'contextMessages'
-      ]);
-      
-      console.log('⚙️ Настройки получены:', settings);
-      
-      const messageData = {
-        type: 'GENERATE_RESPONSES',
-        data: {
-          clientMessage,
-          context,
-          settings: {
-            apiKey: this.apiKey,
-            model: settings.model || 'gpt-5',
-            customPrompt: settings.customPrompt || '',
-            temperature: settings.temperature || 0.7,
-            maxTokens: settings.maxTokens || 800
-          }
-        }
-      };
-      
-      console.log('📤 Отправка сообщения в background:', messageData);
-      
-      const timeoutId = setTimeout(() => {
-        console.error('⏱️ ТАЙМАУТ! Ответ не получен за 30 секунд');
-        this.showError('Превышено время ожидания ответа от сервера');
-        this.isGenerating = false;
-      }, 30000);
-      
-      chrome.runtime.sendMessage(messageData, (response) => {
-        clearTimeout(timeoutId);
-        
-        console.log('📥 Callback вызван');
-        console.log('📥 Ответ получен:', response);
-        
-        if (chrome.runtime.lastError) {
-          console.error('❌ Chrome runtime error:', chrome.runtime.lastError);
-          this.showError('Ошибка связи: ' + chrome.runtime.lastError.message);
-          this.isGenerating = false;
-          return;
-        }
-        
-        if (!response) {
-          console.error('❌ Пустой ответ от background script');
-          this.showError('Пустой ответ. Перезагрузите расширение.');
-          this.isGenerating = false;
-          return;
-        }
-        
-        if (response.success) {
-          console.log('✅ Успешно получены варианты:', response.variants);
-          this.displayResponses(response.variants);
-        } else {
-          console.error('❌ Ошибка в ответе:', response.error);
-          this.showError('Ошибка: ' + response.error);
-        }
-        this.isGenerating = false;
-      });
-      
-      console.log('✅ Сообщение отправлено, ждём ответа...');
-      
-    } catch (error) {
-      console.error('❌ Ошибка генерации:', error);
-      this.showError('Ошибка генерации ответов: ' + error.message);
-      this.isGenerating = false;
-    }
-  }
-
-  getConversationContext() {
-    const messages = [];
-    const allMessages = document.querySelectorAll('.body-messages-item, [class*="message-item"]');
-    
-    console.log(`📊 Всего сообщений в чате: ${allMessages.length}`);
-    
-    const recentMessages = Array.from(allMessages).slice(-50);
-    
-    console.log(`📊 Берём последние ${recentMessages.length} сообщений`);
-    
-    recentMessages.forEach((msgEl, index) => {
-      const isIncoming = msgEl.classList.contains('incoming') || 
-                        msgEl.querySelector('[class*="incoming"]');
-      const textEl = msgEl.querySelector('[dir="auto"], .body-text, [class*="text"]');
-      
-      if (textEl) {
-        const messageText = textEl.textContent.trim();
-        messages.push({
-          role: isIncoming ? 'client' : 'manager',
-          text: messageText,
-          index: index + 1
-        });
-      }
-    });
-    
-    console.log('📝 Контекст сформирован:');
-    console.log(`   - Всего сообщений: ${messages.length}`);
-    console.log(`   - От клиента: ${messages.filter(m => m.role === 'client').length}`);
-    console.log(`   - От менеджера: ${messages.filter(m => m.role === 'manager').length}`);
-    
-    const lastClientMessage = messages.filter(m => m.role === 'client').pop();
-    if (lastClientMessage) {
-      console.log(`   - Последнее сообщение клиента: "${lastClientMessage.text.substring(0, 50)}..."`);
-    }
-    
-    return messages;
-  }
-
-  showLoading() {
-    const content = this.panel.querySelector('.wai-content');
-    content.innerHTML = `
-      <div class="wai-loader">
-        <div class="wai-spinner"></div>
-        <p>Генерирую варианты ответов...</p>
-      </div>
-    `;
-  }
-
-  displayResponses(responses) {
-    const content = this.panel.querySelector('.wai-content');
-    content.innerHTML = '';
-
-    responses.forEach((response, index) => {
-      const suggestionEl = document.createElement('div');
-      suggestionEl.className = 'wai-suggestion';
-      suggestionEl.innerHTML = `
-        <div class="wai-suggestion-label">${response.label}</div>
-        <div class="wai-suggestion-text">${response.text}</div>
-        <div class="wai-suggestion-actions">
-          <button class="wai-btn wai-btn-insert" data-index="${index}">
-            📋 Вставить
-          </button>
-          <button class="wai-btn wai-btn-send" data-index="${index}">
-            ✉️ Отправить
-          </button>
-        </div>
-      `;
-
-      suggestionEl.querySelector('.wai-btn-insert').addEventListener('click', () => {
-        this.insertResponse(response.text);
-      });
-
-      suggestionEl.querySelector('.wai-btn-send').addEventListener('click', () => {
-        this.insertAndSendResponse(response.text);
-      });
-
-      content.appendChild(suggestionEl);
-    });
-
-    console.log('✅ Варианты ответов отображены');
-  }
-
-  insertResponse(text) {
-    const inputField = 
-      document.querySelector('.chat-input[contenteditable="true"]') ||
-      document.querySelector('.chat-input') ||
-      document.querySelector('.chat-input-text[contenteditable="true"]') ||
-      document.querySelector('[contenteditable="true"]');
-    
-    if (!inputField) {
-      console.error('❌ Поле ввода не найдено');
-      
-      const allEditable = document.querySelectorAll('[contenteditable="true"]');
-      console.log('Найдено contenteditable элементов:', allEditable.length);
-      allEditable.forEach((el, i) => {
-        console.log(`${i + 1}. Класс: "${el.className}", Тег: ${el.tagName}`);
-      });
-      
-      this.showError('Поле ввода не найдено');
-      return;
-    }
-
-    console.log('✅ Поле ввода найдено:', inputField.className);
-
-    inputField.innerHTML = '';
-    inputField.textContent = text;
-    
-    inputField.dispatchEvent(new Event('input', { bubbles: true }));
-    inputField.dispatchEvent(new Event('change', { bubbles: true }));
-    inputField.focus();
-
-    console.log('✅ Текст вставлен в поле ввода');
-  }
-
-  insertAndSendResponse(text) {
-    this.insertResponse(text);
-    
-    setTimeout(() => {
-      const sendBtn = document.querySelector(this.selectors.sendButton);
-      if (sendBtn) {
-        sendBtn.click();
-        console.log('✅ Сообщение отправлено');
-      }
-    }, 100);
-  }
-
-  showError(message) {
-    const content = this.panel.querySelector('.wai-content');
-    content.innerHTML = `
-      <div class="wai-error">
-        <span class="wai-error-icon">⚠️</span>
-        <p>${message}</p>
-      </div>
-    `;
-  }
-}
+      const settings
 
 // Запускаем расширение
 const assistant = new WazzupAIAssistant();
