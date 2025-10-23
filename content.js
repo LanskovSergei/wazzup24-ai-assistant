@@ -11,7 +11,7 @@ class WazzupAIAssistant {
     this.lastProcessedChatId = null;
     this.keepAlivePort = null;
     this.currentView = 'responses';
-    this.panelPosition = 100; // ИСПРАВЛЕНО: начальный отступ 100px
+    this.panelPosition = 100;
     this.systemPrompt = '';
     
     // Селекторы для Wazzup24
@@ -217,20 +217,18 @@ class WazzupAIAssistant {
     document.body.appendChild(panel);
     this.panel = panel;
 
-    // Устанавливаем промпт через JavaScript после добавления в DOM
     const textarea = panel.querySelector('.wai-prompt-textarea');
     if (textarea) {
       textarea.value = this.systemPrompt;
       console.log('✅ Промпт установлен в textarea, длина:', this.systemPrompt.length);
     }
 
-    // ИСПРАВЛЕНО: правильная логика кнопок
     panel.querySelector('.wai-move-up').addEventListener('click', () => {
-      this.movePanel(25); // вверх = увеличиваем bottom
+      this.movePanel(25);
     });
 
     panel.querySelector('.wai-move-down').addEventListener('click', () => {
-      this.movePanel(-25); // вниз = уменьшаем bottom
+      this.movePanel(-25);
     });
 
     panel.querySelector('.wai-refresh').addEventListener('click', () => {
@@ -247,7 +245,6 @@ class WazzupAIAssistant {
       panel.classList.toggle('wai-collapsed');
     });
 
-    // Переключение табов
     const tabs = panel.querySelectorAll('.wai-tab');
     tabs.forEach(tab => {
       tab.addEventListener('click', () => {
@@ -256,7 +253,6 @@ class WazzupAIAssistant {
       });
     });
 
-    // Кнопки в редакторе промпта
     panel.querySelector('.wai-btn-save-prompt').addEventListener('click', () => {
       this.savePrompt();
     });
@@ -269,7 +265,6 @@ class WazzupAIAssistant {
   }
 
   switchTab(tabName) {
-    // Переключаем активную вкладку
     this.panel.querySelectorAll('.wai-tab').forEach(tab => {
       if (tab.dataset.tab === tabName) {
         tab.classList.add('wai-tab-active');
@@ -278,7 +273,6 @@ class WazzupAIAssistant {
       }
     });
 
-    // Переключаем активное представление
     this.panel.querySelectorAll('.wai-view').forEach(view => {
       if (view.classList.contains(`wai-view-${tabName}`)) {
         view.classList.add('wai-view-active');
@@ -305,7 +299,6 @@ class WazzupAIAssistant {
     chrome.storage.sync.set({ systemPrompt: newPrompt }, () => {
       console.log('✅ Промпт сохранён, длина:', newPrompt.length);
       
-      // Показываем уведомление
       const saveBtn = this.panel.querySelector('.wai-btn-save-prompt');
       const originalText = saveBtn.textContent;
       saveBtn.textContent = '✅ Сохранено!';
@@ -332,7 +325,6 @@ class WazzupAIAssistant {
     chrome.storage.sync.set({ systemPrompt: defaultPrompt }, () => {
       console.log('✅ Промпт сброшен к значению по умолчанию');
       
-      // Показываем уведомление
       const resetBtn = this.panel.querySelector('.wai-btn-reset-prompt');
       const originalText = resetBtn.textContent;
       resetBtn.textContent = '✅ Сброшено!';
@@ -656,44 +648,42 @@ class WazzupAIAssistant {
     const inputField = 
       document.querySelector('.chat-input[contenteditable="true"]') ||
       document.querySelector('.chat-input') ||
-      document.querySelector('.chat-input-text[contenteditable="true"]') ||
       document.querySelector('[contenteditable="true"]');
     
     if (!inputField) {
       console.error('❌ Поле ввода не найдено');
-      
-      const allEditable = document.querySelectorAll('[contenteditable="true"]');
-      console.log('Найдено contenteditable элементов:', allEditable.length);
-      allEditable.forEach((el, i) => {
-        console.log(`${i + 1}. Класс: "${el.className}", Тег: ${el.tagName}`);
-      });
-      
       this.showError('Поле ввода не найдено');
       return;
     }
 
     console.log('✅ Поле ввода найдено:', inputField.className);
 
-    // Очищаем поле
-    inputField.innerHTML = '';
-    inputField.textContent = text;
-    
-    // Триггерим ВСЕ необходимые события для Wazzup24
-    inputField.dispatchEvent(new InputEvent('input', { 
-      bubbles: true, 
-      cancelable: true,
-      data: text,
-      inputType: 'insertText'
-    }));
-    
-    inputField.dispatchEvent(new Event('change', { bubbles: true }));
-    inputField.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
-    inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-    
-    // Фокусируемся на поле
+    // КРИТИЧНО: Сначала фокусируемся, потом вставляем
     inputField.focus();
     
-    // Ставим курсор в конец текста
+    // Очищаем поле
+    inputField.innerHTML = '';
+    
+    // Вставляем текст посимвольно (имитируем набор)
+    let currentText = '';
+    for (let char of text) {
+      currentText += char;
+      inputField.textContent = currentText;
+      
+      // Триггерим события после каждого символа
+      inputField.dispatchEvent(new InputEvent('input', { 
+        bubbles: true,
+        cancelable: true,
+        inputType: 'insertText',
+        data: char
+      }));
+    }
+    
+    // Финальные события
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+    
+    // Ставим курсор в конец
     const range = document.createRange();
     const sel = window.getSelection();
     range.selectNodeContents(inputField);
@@ -701,33 +691,31 @@ class WazzupAIAssistant {
     sel.removeAllRanges();
     sel.addRange(range);
 
-    console.log('✅ Текст вставлен, все события отправлены');
+    console.log('✅ Текст вставлен посимвольно, Wazzup24 должен увидеть изменения');
   }
 
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
+    // Даем Wazzup24 время обработать изменения и переключить кнопку
     setTimeout(() => {
-      const inputField = document.querySelector('.chat-input[contenteditable="true"]');
-      
-      if (inputField) {
-        // Симулируем нажатие Enter вместо клика по кнопке
-        const enterEvent = new KeyboardEvent('keydown', {
-          key: 'Enter',
-          code: 'Enter',
-          keyCode: 13,
-          which: 13,
-          bubbles: true,
-          cancelable: true
-        });
-        
-        inputField.dispatchEvent(enterEvent);
-        
-        console.log('✅ Enter отправлен, сообщение должно отправиться');
-      } else {
-        console.error('❌ Не удалось найти поле ввода для отправки');
+      // Ищем кнопку отправки в контейнере footer-send
+      const sendContainer = document.querySelector('.footer-send');
+      if (!sendContainer) {
+        console.error('❌ Контейнер footer-send не найден');
+        return;
       }
-    }, 300); // Увеличил задержку до 300ms
+      
+      // Ищем кнопку внутри контейнера
+      const sendBtn = sendContainer.querySelector('button');
+      
+      if (sendBtn) {
+        console.log('✅ Кнопка отправки найдена, кликаем');
+        sendBtn.click();
+      } else {
+        console.error('❌ Кнопка отправки не найдена в контейнере');
+      }
+    }, 500); // Увеличил задержку до 500ms
   }
 
   showError(message) {
