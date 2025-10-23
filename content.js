@@ -349,42 +349,53 @@ class WazzupAIAssistant {
     }
   }
 
-  // ПРОСТАЯ вставка текста - как в самой ранней версии
+  // ИСПРАВЛЕНО: вставка в правильное поле!
   insertResponse(text) {
     console.log('📝 Вставка текста:', text);
 
-    const inputField = document.querySelector('.chat-input[contenteditable="true"]');
+    // Ищем ПРАВИЛЬНОЕ поле - .chat-input-field (не .chat-input!)
+    const chatInputField = document.querySelector('.chat-input-field');
     
-    if (!inputField) {
-      console.error('❌ Поле ввода не найдено');
+    if (!chatInputField) {
+      console.error('❌ Поле .chat-input-field не найдено');
       this.showError('Поле ввода не найдено');
       return;
     }
 
-    console.log('✅ Поле ввода найдено');
+    console.log('✅ Поле ввода найдено:', chatInputField);
 
-    // Простая вставка - как в оригинале
-    inputField.textContent = text;
-    inputField.dispatchEvent(new Event('input', { bubbles: true }));
-    inputField.focus();
+    // Вставляем текст и триггерим событие
+    chatInputField.focus();
+    chatInputField.textContent = text;
+    chatInputField.dispatchEvent(new Event('input', { bubbles: true }));
     
-    console.log('✅ Текст вставлен');
+    console.log('✅ Текст вставлен, кнопка должна активироваться');
   }
 
-  // ПРОСТАЯ отправка - как в самой ранней версии
+  // ИСПРАВЛЕНО: отправка через активную кнопку
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
     setTimeout(() => {
       const sendBtn = document.querySelector('.footer-send button');
       
-      if (sendBtn) {
-        console.log('✅ Кнопка найдена, кликаем');
+      if (sendBtn && sendBtn.className.includes('primary--text')) {
+        console.log('✅ Кнопка активна, отправляем');
         sendBtn.click();
       } else {
-        console.error('❌ Кнопка отправки не найдена');
+        console.error('❌ Кнопка не активна:', sendBtn?.className);
+        // Попробуем еще раз через 200ms
+        setTimeout(() => {
+          const btn = document.querySelector('.footer-send button');
+          if (btn && btn.className.includes('primary--text')) {
+            console.log('✅ Кнопка активна (2-я попытка), отправляем');
+            btn.click();
+          } else {
+            console.error('❌ Кнопка так и не активировалась');
+          }
+        }, 200);
       }
-    }, 100); // Короткая задержка как в оригинале
+    }, 300);
   }
 
   showError(message) {
