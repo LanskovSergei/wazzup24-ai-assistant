@@ -349,100 +349,42 @@ class WazzupAIAssistant {
     }
   }
 
-  async waitForInputField() {
-    console.log('⏳ Ожидание поля ввода...');
-    
-    for (let i = 0; i < 50; i++) {
-      const inputField = document.querySelector('.chat-input[contenteditable="true"]');
-      if (inputField) {
-        console.log('✅ Поле ввода найдено');
-        return inputField;
-      }
-      await this.sleep(100);
-    }
-    
-    console.error('❌ Поле ввода не найдено после 5 секунд ожидания');
-    return null;
-  }
-
-  async insertResponse(text) {
+  // ПРОСТАЯ вставка текста - как в самой ранней версии
+  insertResponse(text) {
     console.log('📝 Вставка текста:', text);
 
-    const inputField = await this.waitForInputField();
+    const inputField = document.querySelector('.chat-input[contenteditable="true"]');
     
     if (!inputField) {
-      const allEditableFields = document.querySelectorAll('[contenteditable="true"]');
-      console.log('🔍 Все contenteditable поля:', allEditableFields.length);
-      allEditableFields.forEach((el, i) => {
-        console.log(`  ${i + 1}. Класс: "${el.className}", Тег: ${el.tagName}`);
-      });
-      
+      console.error('❌ Поле ввода не найдено');
       this.showError('Поле ввода не найдено');
       return;
     }
 
-    console.log('✅ Поле ввода найдено:', inputField.className);
+    console.log('✅ Поле ввода найдено');
 
-    // Очищаем поле
-    inputField.innerHTML = '';
-    
-    // Создаем текстовый узел (важно для сохранения редактируемости)
-    const textNode = document.createTextNode(text);
-    inputField.appendChild(textNode);
-    
-    // Устанавливаем фокус
+    // Простая вставка - как в оригинале
+    inputField.textContent = text;
+    inputField.dispatchEvent(new Event('input', { bubbles: true }));
     inputField.focus();
     
-    // Ставим курсор в конец текста
-    const range = document.createRange();
-    const sel = window.getSelection();
-    range.setStart(textNode, text.length);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
-    
-    // Отправляем события для Wazzup24
-    inputField.dispatchEvent(new InputEvent('input', { 
-      bubbles: true, 
-      cancelable: true,
-      data: text,
-      inputType: 'insertText'
-    }));
-    
-    inputField.dispatchEvent(new Event('change', { bubbles: true }));
-    inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
-    
-    console.log('✅ Текст вставлен и поле готово к редактированию');
+    console.log('✅ Текст вставлен');
   }
 
+  // ПРОСТАЯ отправка - как в самой ранней версии
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
     setTimeout(() => {
-      const sendButton = document.querySelector('button[class*="send"]');
+      const sendBtn = document.querySelector('.footer-send button');
       
-      if (sendButton) {
-        sendButton.click();
-        console.log('✅ Кнопка отправки нажата');
+      if (sendBtn) {
+        console.log('✅ Кнопка найдена, кликаем');
+        sendBtn.click();
       } else {
         console.error('❌ Кнопка отправки не найдена');
-        
-        // Альтернативный метод: нажатие Enter
-        const inputField = document.querySelector('.chat-input[contenteditable="true"]');
-        if (inputField) {
-          const enterEvent = new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true
-          });
-          inputField.dispatchEvent(enterEvent);
-          console.log('✅ Отправлено через Enter');
-        }
       }
-    }, 300);
+    }, 100); // Короткая задержка как в оригинале
   }
 
   showError(message) {
