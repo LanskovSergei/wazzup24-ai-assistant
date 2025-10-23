@@ -568,3 +568,19 @@ document.head.appendChild(style);
 
 // Запускаем расширение
 const assistant = new WazzupAIAssistant();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
