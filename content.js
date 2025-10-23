@@ -16,7 +16,7 @@ class WazzupAIAssistant {
     
     // Селекторы для Wazzup24
     this.selectors = {
-      chatInput: '.chat-input[contenteditable="true"]',
+      chatInput: '.chat-input-text',
       messagesList: '.body-messages-list',
       incomingMessage: '.body-messages-item.incoming',
       messageText: '.body-text-message.body-text div[dir="auto"]',
@@ -645,10 +645,7 @@ class WazzupAIAssistant {
   }
 
   insertResponse(text) {
-    const inputField = 
-      document.querySelector('.chat-input[contenteditable="true"]') ||
-      document.querySelector('.chat-input') ||
-      document.querySelector('[contenteditable="true"]');
+    const inputField = document.querySelector('.chat-input-text');
     
     if (!inputField) {
       console.error('❌ Поле ввода не найдено');
@@ -658,32 +655,27 @@ class WazzupAIAssistant {
 
     console.log('✅ Поле ввода найдено:', inputField.className);
 
-    // КРИТИЧНО: Сначала фокусируемся, потом вставляем
-    inputField.focus();
-    
     // Очищаем поле
+    inputField.textContent = '';
     inputField.innerHTML = '';
     
-    // Вставляем текст посимвольно (имитируем набор)
-    let currentText = '';
-    for (let char of text) {
-      currentText += char;
-      inputField.textContent = currentText;
-      
-      // Триггерим события после каждого символа
-      inputField.dispatchEvent(new InputEvent('input', { 
-        bubbles: true,
-        cancelable: true,
-        inputType: 'insertText',
-        data: char
-      }));
-    }
+    // Вставляем текст
+    inputField.textContent = text;
     
-    // Финальные события
+    // КРИТИЧНО: Используем InputEvent, а не просто Event
+    const inputEvent = new InputEvent('input', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text
+    });
+    
+    inputField.dispatchEvent(inputEvent);
     inputField.dispatchEvent(new Event('change', { bubbles: true }));
-    inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
     
-    // Ставим курсор в конец
+    // Фокусируемся и ставим курсор в конец
+    inputField.focus();
+    
     const range = document.createRange();
     const sel = window.getSelection();
     range.selectNodeContents(inputField);
@@ -691,31 +683,29 @@ class WazzupAIAssistant {
     sel.removeAllRanges();
     sel.addRange(range);
 
-    console.log('✅ Текст вставлен посимвольно, Wazzup24 должен увидеть изменения');
+    console.log('✅ Текст вставлен, InputEvent отправлен');
   }
 
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
-    // Даем Wazzup24 время обработать изменения и переключить кнопку
+    // Даем Wazzup24 время переключить кнопку с микрофона на отправку
     setTimeout(() => {
-      // Ищем кнопку отправки в контейнере footer-send
-      const sendContainer = document.querySelector('.footer-send');
-      if (!sendContainer) {
-        console.error('❌ Контейнер footer-send не найден');
-        return;
-      }
-      
-      // Ищем кнопку внутри контейнера
-      const sendBtn = sendContainer.querySelector('button');
+      const sendBtn = document.querySelector('.footer-send button');
       
       if (sendBtn) {
-        console.log('✅ Кнопка отправки найдена, кликаем');
-        sendBtn.click();
+        // Проверяем, что кнопка переключилась на отправку (primary--text)
+        if (sendBtn.className.includes('primary--text')) {
+          console.log('✅ Кнопка отправки активна, кликаем');
+          sendBtn.click();
+        } else {
+          console.error('❌ Кнопка не переключилась на отправку (всё ещё микрофон)');
+          console.log('Класс кнопки:', sendBtn.className);
+        }
       } else {
-        console.error('❌ Кнопка отправки не найдена в контейнере');
+        console.error('❌ Кнопка отправки не найдена');
       }
-    }, 500); // Увеличил задержку до 500ms
+    }, 300);
   }
 
   showError(message) {
