@@ -233,30 +233,30 @@ class WazzupAIAssistant {
       this.movePanel(-25); // вниз = уменьшаем bottom
     });
 
-    // Обработчик кнопки обновления
     panel.querySelector('.wai-refresh').addEventListener('click', () => {
-      console.log('🔄 Запрос на обновление ответов');
-      if (this.lastMessageText) {
-        this.generateResponses(this.lastMessageText);
+      console.log('🔄 Обновление ответов...');
+      const lastMessage = this.getLastIncomingMessage();
+      if (lastMessage) {
+        this.generateResponses(lastMessage);
       } else {
-        this.showError('Нет сообщения для обновления');
+        this.showError('Нет входящих сообщений для обновления');
       }
     });
 
-    // Обработчик кнопки закрытия
     panel.querySelector('.wai-close').addEventListener('click', () => {
-      panel.classList.toggle('wai-minimized');
+      panel.classList.toggle('wai-collapsed');
     });
 
-    // Обработчики вкладок
-    panel.querySelectorAll('.wai-tab').forEach(tab => {
+    // Переключение табов
+    const tabs = panel.querySelectorAll('.wai-tab');
+    tabs.forEach(tab => {
       tab.addEventListener('click', () => {
-        const tabName = tab.dataset.tab;
-        this.switchTab(tabName);
+        const targetTab = tab.dataset.tab;
+        this.switchTab(targetTab);
       });
     });
 
-    // Обработчики кнопок промпта
+    // Кнопки в редакторе промпта
     panel.querySelector('.wai-btn-save-prompt').addEventListener('click', () => {
       this.savePrompt();
     });
@@ -265,45 +265,30 @@ class WazzupAIAssistant {
       this.resetPrompt();
     });
 
-    console.log('🎨 Панель создана и добавлена в DOM');
-  }
-
-  movePanel(delta) {
-    this.panelPosition += delta;
-    
-    // Ограничения
-    const maxHeight = window.innerHeight - 700;
-    if (this.panelPosition < 20) this.panelPosition = 20;
-    if (this.panelPosition > maxHeight) this.panelPosition = maxHeight;
-    
-    this.updatePanelPosition();
-    this.savePanelPosition();
-  }
-
-  updatePanelPosition() {
-    if (this.panel) {
-      this.panel.style.bottom = `${this.panelPosition}px`;
-      console.log('📍 Позиция обновлена:', this.panelPosition);
-    }
+    console.log('✅ Панель создана');
   }
 
   switchTab(tabName) {
     // Переключаем активную вкладку
     this.panel.querySelectorAll('.wai-tab').forEach(tab => {
-      tab.classList.remove('wai-tab-active');
       if (tab.dataset.tab === tabName) {
         tab.classList.add('wai-tab-active');
+      } else {
+        tab.classList.remove('wai-tab-active');
       }
     });
 
-    // Переключаем видимость контента
+    // Переключаем активное представление
     this.panel.querySelectorAll('.wai-view').forEach(view => {
-      view.classList.remove('wai-view-active');
+      if (view.classList.contains(`wai-view-${tabName}`)) {
+        view.classList.add('wai-view-active');
+      } else {
+        view.classList.remove('wai-view-active');
+      }
     });
-    this.panel.querySelector(`.wai-view-${tabName}`).classList.add('wai-view-active');
 
     this.currentView = tabName;
-    console.log('🔄 Переключено на вкладку:', tabName);
+    console.log('✅ Переключено на вкладку:', tabName);
   }
 
   savePrompt() {
@@ -316,14 +301,25 @@ class WazzupAIAssistant {
     }
 
     this.systemPrompt = newPrompt;
+    
     chrome.storage.sync.set({ systemPrompt: newPrompt }, () => {
-      alert('✅ Промпт сохранён успешно!');
-      console.log('💾 Промпт сохранён, длина:', newPrompt.length);
+      console.log('✅ Промпт сохранён, длина:', newPrompt.length);
+      
+      // Показываем уведомление
+      const saveBtn = this.panel.querySelector('.wai-btn-save-prompt');
+      const originalText = saveBtn.textContent;
+      saveBtn.textContent = '✅ Сохранено!';
+      saveBtn.style.background = '#10b981';
+      
+      setTimeout(() => {
+        saveBtn.textContent = originalText;
+        saveBtn.style.background = '';
+      }, 2000);
     });
   }
 
   resetPrompt() {
-    if (!confirm('Сбросить промпт на значение по умолчанию?')) {
+    if (!confirm('Вы уверены, что хотите сбросить промпт к значению по умолчанию?')) {
       return;
     }
 
@@ -331,60 +327,44 @@ class WazzupAIAssistant {
     this.systemPrompt = defaultPrompt;
     
     const textarea = this.panel.querySelector('.wai-prompt-textarea');
-    if (textarea) {
-      textarea.value = defaultPrompt;
-    }
-
+    textarea.value = defaultPrompt;
+    
     chrome.storage.sync.set({ systemPrompt: defaultPrompt }, () => {
-      alert('✅ Промпт сброшен на default!');
-      console.log('🔄 Промпт сброшен, длина:', defaultPrompt.length);
+      console.log('✅ Промпт сброшен к значению по умолчанию');
+      
+      // Показываем уведомление
+      const resetBtn = this.panel.querySelector('.wai-btn-reset-prompt');
+      const originalText = resetBtn.textContent;
+      resetBtn.textContent = '✅ Сброшено!';
+      resetBtn.style.background = '#10b981';
+      
+      setTimeout(() => {
+        resetBtn.textContent = originalText;
+        resetBtn.style.background = '';
+      }, 2000);
     });
   }
 
-  checkLastMessage() {
-    console.log('🔍 Проверка последнего входящего сообщения...');
-    
-    const incomingMessages = document.querySelectorAll(
-      '.body-messages-item.incoming, [class*="incoming"]'
-    );
-    
-    if (incomingMessages.length === 0) {
-      console.log('ℹ️ Входящих сообщений не найдено');
-      this.showEmptyState();
-      return;
-    }
-    
-    const lastIncoming = incomingMessages[incomingMessages.length - 1];
-    console.log('✅ Найдено последнее входящее сообщение');
-    
-    this.onNewIncomingMessage(lastIncoming, true);
+  movePanel(delta) {
+    this.panelPosition += delta;
+    this.panelPosition = Math.max(20, Math.min(this.panelPosition, window.innerHeight - 100));
+    this.updatePanelPosition();
+    this.savePanelPosition();
   }
 
-  watchChatChanges() {
-    console.log('👀 Начинаем отслеживать смену чата...');
-    
-    let lastUrl = location.href;
-    new MutationObserver(() => {
-      const url = location.href;
-      if (url !== lastUrl) {
-        console.log('🔄 URL изменился, чат переключен');
-        lastUrl = url;
-        this.lastMessageText = '';
-        this.lastProcessedChatId = null;
-        
-        setTimeout(() => this.checkLastMessage(), 1000);
-      }
-    }).observe(document, { subtree: true, childList: true });
+  updatePanelPosition() {
+    if (this.panel) {
+      this.panel.style.bottom = `${this.panelPosition}px`;
+      console.log('📍 Панель перемещена на:', this.panelPosition);
+    }
   }
 
   watchMessages() {
-    const messagesList = 
-      document.querySelector('.body-messages-list') ||
-      document.querySelector('[class*="messages-list"]') ||
-      document.querySelector('[class*="chat-messages"]') ||
-      document.querySelector('.chat-body-wrapper') ||
-      document.querySelector('.message-item-hover')?.parentElement ||
-      document.body;
+    const messagesList = document.querySelector('.body-messages-list') ||
+                        document.querySelector('[class*="messages-list"]') ||
+                        document.querySelector('[class*="chat-messages"]') ||
+                        document.querySelector('.message-item-hover')?.parentElement ||
+                        document.body;
     
     if (!messagesList) {
       console.log('⏳ Список сообщений не найден, повтор через 2 сек...');
@@ -399,13 +379,12 @@ class WazzupAIAssistant {
         if (mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1 && node.querySelector) {
-              const incomingMsg = 
-                node.querySelector('.body-messages-item.incoming') ||
-                (node.classList && node.classList.contains('incoming') ? node : null) ||
-                node.querySelector('[class*="incoming"]');
-                
+              const incomingMsg = node.querySelector('.body-messages-item.incoming') ||
+                                (node.classList && node.classList.contains('incoming') ? node : null) ||
+                                node.querySelector('[class*="incoming"]');
+              
               if (incomingMsg) {
-                this.onNewIncomingMessage(incomingMsg, false);
+                this.onNewIncomingMessage(incomingMsg);
               }
             }
           });
@@ -421,81 +400,89 @@ class WazzupAIAssistant {
     console.log('👀 Наблюдатель за сообщениями активирован');
   }
 
-  onNewIncomingMessage(messageElement, isInitial = false) {
-    console.log('🔔 Обнаружено входящее сообщение', isInitial ? '(при загрузке)' : '(новое)');
-    
-    const textElement = 
-      messageElement.querySelector(this.selectors.messageText) ||
-      messageElement.querySelector('[dir="auto"]') ||
-      messageElement.querySelector('.body-text') ||
-      messageElement.querySelector('[class*="text"]');
-      
-    if (!textElement) {
-      console.log('⚠️ Текст сообщения не найден');
-      if (isInitial) this.showEmptyState();
-      return;
-    }
+  watchChatChanges() {
+    const observer = new MutationObserver(() => {
+      const currentChatId = this.getCurrentChatId();
+      if (currentChatId && currentChatId !== this.lastProcessedChatId) {
+        console.log('🔄 Обнаружена смена чата');
+        this.lastProcessedChatId = currentChatId;
+        this.lastMessageText = '';
+        setTimeout(() => this.checkLastMessage(), 500);
+      }
+    });
 
-    const messageText = textElement.textContent.trim();
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class']
+    });
+  }
+
+  getCurrentChatId() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('id') || window.location.pathname;
+  }
+
+  onNewIncomingMessage(messageElement) {
+    console.log('📨 Обнаружено новое входящее сообщение');
     
-    if (!messageText) {
-      console.log('ℹ️ Сообщение пустое');
-      if (isInitial) this.showEmptyState();
-      return;
-    }
-    
-    if (isInitial || messageText !== this.lastMessageText) {
-      this.lastMessageText = messageText;
-      console.log('📨 Сообщение для обработки:', messageText);
-      this.generateResponses(messageText);
-    } else {
-      console.log('ℹ️ Дубликат сообщения, игнорируем');
+    setTimeout(() => {
+      const textElement = messageElement.querySelector('[dir="auto"], .body-text, [class*="text"]');
+      if (textElement) {
+        const messageText = textElement.textContent.trim();
+        console.log('💬 Текст сообщения:', messageText.substring(0, 100));
+        
+        if (messageText && messageText !== this.lastMessageText) {
+          this.lastMessageText = messageText;
+          this.generateResponses(messageText);
+        }
+      }
+    }, 300);
+  }
+
+  checkLastMessage() {
+    const lastMessage = this.getLastIncomingMessage();
+    if (lastMessage && lastMessage !== this.lastMessageText) {
+      console.log('🔍 Найдено последнее сообщение при проверке');
+      this.lastMessageText = lastMessage;
+      this.generateResponses(lastMessage);
     }
   }
 
-  showEmptyState() {
-    const content = this.panel.querySelector('.wai-view-responses');
-    if (content) {
-      content.innerHTML = `
-        <div class="wai-empty">
-          <p>Нет входящих сообщений</p>
-          <small>Когда клиент напишет, я предложу варианты ответов</small>
-        </div>
-      `;
-    }
+  getLastIncomingMessage() {
+    const incomingMessages = document.querySelectorAll('.body-messages-item.incoming, [class*="incoming"]');
+    if (incomingMessages.length === 0) return null;
+    
+    const lastMsg = incomingMessages[incomingMessages.length - 1];
+    const textElement = lastMsg.querySelector('[dir="auto"], .body-text, [class*="text"]');
+    
+    return textElement ? textElement.textContent.trim() : null;
   }
 
   async wakeUpServiceWorker() {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      console.log('⏰ Пробуждаем Service Worker...');
       chrome.runtime.sendMessage({ type: 'PING' }, (response) => {
         if (chrome.runtime.lastError) {
-          console.log('⚠️ Service Worker спит, пробуем разбудить...');
-          setTimeout(() => {
-            chrome.runtime.sendMessage({ type: 'PING' }, () => {
-              resolve();
-            });
-          }, 100);
+          console.error('❌ Ошибка пробуждения SW:', chrome.runtime.lastError);
+          reject(chrome.runtime.lastError);
         } else {
-          console.log('✅ Service Worker активен');
-          resolve();
+          console.log('✅ Service Worker пробуждён');
+          resolve(response);
         }
       });
     });
   }
 
   async generateResponses(clientMessage) {
-    console.log('🎯 generateResponses вызван с сообщением:', clientMessage);
-    
     if (!this.apiKey) {
-      console.error('❌ API ключ не найден');
-      this.showError('API ключ OpenAI не настроен. Откройте настройки расширения.');
+      this.showError('API ключ не настроен. Откройте настройки расширения.');
       return;
     }
 
-    console.log('✅ API ключ найден:', this.apiKey.substring(0, 10) + '...');
-
     if (this.isGenerating) {
-      console.log('⏳ Генерация уже выполняется...');
+      console.log('⏳ Генерация уже в процессе, пропускаем...');
       return;
     }
 
@@ -687,31 +674,60 @@ class WazzupAIAssistant {
 
     console.log('✅ Поле ввода найдено:', inputField.className);
 
-    const isUserEditing = document.activeElement === inputField;
-
+    // Очищаем поле
     inputField.innerHTML = '';
     inputField.textContent = text;
     
-    inputField.dispatchEvent(new Event('input', { bubbles: true }));
-    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    // Триггерим ВСЕ необходимые события для Wazzup24
+    inputField.dispatchEvent(new InputEvent('input', { 
+      bubbles: true, 
+      cancelable: true,
+      data: text,
+      inputType: 'insertText'
+    }));
     
-    if (!isUserEditing) {
-      inputField.focus();
-    }
+    inputField.dispatchEvent(new Event('change', { bubbles: true }));
+    inputField.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true }));
+    inputField.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+    
+    // Фокусируемся на поле
+    inputField.focus();
+    
+    // Ставим курсор в конец текста
+    const range = document.createRange();
+    const sel = window.getSelection();
+    range.selectNodeContents(inputField);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
 
-    console.log('✅ Текст вставлен в поле ввода');
+    console.log('✅ Текст вставлен, все события отправлены');
   }
 
   insertAndSendResponse(text) {
     this.insertResponse(text);
     
     setTimeout(() => {
-      const sendBtn = document.querySelector(this.selectors.sendButton);
-      if (sendBtn) {
-        sendBtn.click();
-        console.log('✅ Сообщение отправлено');
+      const inputField = document.querySelector('.chat-input[contenteditable="true"]');
+      
+      if (inputField) {
+        // Симулируем нажатие Enter вместо клика по кнопке
+        const enterEvent = new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          bubbles: true,
+          cancelable: true
+        });
+        
+        inputField.dispatchEvent(enterEvent);
+        
+        console.log('✅ Enter отправлен, сообщение должно отправиться');
+      } else {
+        console.error('❌ Не удалось найти поле ввода для отправки');
       }
-    }, 100);
+    }, 300); // Увеличил задержку до 300ms
   }
 
   showError(message) {
