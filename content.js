@@ -310,11 +310,8 @@ class WazzupAIAssistant {
       responseCard.innerHTML = `
         <div class="wai-response-text">${this.escapeHtml(response)}</div>
         <div class="wai-response-actions">
-          <button class="wai-btn wai-btn-insert" data-index="${index}">
-            📋 Вставить
-          </button>
-          <button class="wai-btn wai-btn-send" data-index="${index}">
-            ✉️ Отправить
+          <button class="wai-btn wai-btn-copy" data-index="${index}">
+            📋 Скопировать
           </button>
         </div>
       `;
@@ -322,17 +319,10 @@ class WazzupAIAssistant {
       content.appendChild(responseCard);
     });
 
-    content.querySelectorAll('.wai-btn-insert').forEach(btn => {
+    content.querySelectorAll('.wai-btn-copy').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const index = parseInt(e.target.dataset.index);
-        this.insertResponse(this.responses[index]);
-      });
-    });
-
-    content.querySelectorAll('.wai-btn-send').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        this.insertAndSendResponse(this.responses[index]);
+        this.copyToClipboard(this.responses[index], e.target);
       });
     });
   }
@@ -349,53 +339,26 @@ class WazzupAIAssistant {
     }
   }
 
-  // ИСПРАВЛЕНО: вставка в правильное поле!
-  insertResponse(text) {
-    console.log('📝 Вставка текста:', text);
-
-    // Ищем ПРАВИЛЬНОЕ поле - .chat-input-field (не .chat-input!)
-    const chatInputField = document.querySelector('.chat-input-field');
-    
-    if (!chatInputField) {
-      console.error('❌ Поле .chat-input-field не найдено');
-      this.showError('Поле ввода не найдено');
-      return;
-    }
-
-    console.log('✅ Поле ввода найдено:', chatInputField);
-
-    // Вставляем текст и триггерим событие
-    chatInputField.focus();
-    chatInputField.textContent = text;
-    chatInputField.dispatchEvent(new Event('input', { bubbles: true }));
-    
-    console.log('✅ Текст вставлен, кнопка должна активироваться');
-  }
-
-  // ИСПРАВЛЕНО: отправка через активную кнопку
-  insertAndSendResponse(text) {
-    this.insertResponse(text);
-    
-    setTimeout(() => {
-      const sendBtn = document.querySelector('.footer-send button');
+  // Копирование в буфер обмена
+  async copyToClipboard(text, button) {
+    try {
+      await navigator.clipboard.writeText(text);
+      console.log('✅ Текст скопирован в буфер обмена');
       
-      if (sendBtn && sendBtn.className.includes('primary--text')) {
-        console.log('✅ Кнопка активна, отправляем');
-        sendBtn.click();
-      } else {
-        console.error('❌ Кнопка не активна:', sendBtn?.className);
-        // Попробуем еще раз через 200ms
-        setTimeout(() => {
-          const btn = document.querySelector('.footer-send button');
-          if (btn && btn.className.includes('primary--text')) {
-            console.log('✅ Кнопка активна (2-я попытка), отправляем');
-            btn.click();
-          } else {
-            console.error('❌ Кнопка так и не активировалась');
-          }
-        }, 200);
-      }
-    }, 300);
+      // Показываем feedback
+      const originalText = button.textContent;
+      button.textContent = '✅ Скопировано!';
+      button.style.background = '#48bb78';
+      
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '';
+      }, 2000);
+      
+    } catch (error) {
+      console.error('❌ Ошибка копирования:', error);
+      this.showError('Не удалось скопировать текст');
+    }
   }
 
   showError(message) {
@@ -534,32 +497,24 @@ style.textContent = `
 
   .wai-btn {
     flex: 1;
-    padding: 8px 12px;
+    padding: 10px 16px;
     border: none;
     border-radius: 6px;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
-  }
-
-  .wai-btn-insert {
-    background: #e2e8f0;
-    color: #4a5568;
-  }
-
-  .wai-btn-insert:hover {
-    background: #cbd5e0;
-  }
-
-  .wai-btn-send {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
   }
 
-  .wai-btn-send:hover {
+  .wai-btn-copy:hover {
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+
+  .wai-btn-copy:active {
+    transform: translateY(0);
   }
 
   .wai-loading {
